@@ -1,6 +1,17 @@
-# MNGR v2.3.0 — Weekly Health Manager
+# MNGR v2.4.0 — Period and Viewport Fix
 
 Standalone management intelligence for multiple AGNT teams and authorised solo agents.
+
+## v2.4.0 period and viewport correction
+
+- Consolidates the installed-iPhone bottom navigation into one 56px viewport-fixed bar.
+- Removes the legacy application padding that was adding space above the navigation.
+- Makes Today, This week and Last 4 weeks recalculate Home, Team, Appointments and Trends from the same selected period.
+- Makes homepage agent health, management priority, appointment preview, snapshot and activity chart period-aware.
+- Makes appointment totals and lists use dates from the selected reporting period.
+- Makes trend metrics, charts, conversions, agent rows and direction use the selected reporting period.
+- Separates manager-tool query errors from AGNT reporting health so an access-workflow issue is not presented as missing agent data.
+- AGNT application files, Firestore rules and indexes remain unchanged from v2.3.0.
 
 ## v2.3.0 weekly health and shell correction
 

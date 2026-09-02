@@ -240,3 +240,33 @@ body{inset:0!important}
   .workspace{padding-left:10px!important;padding-right:10px!important}
   .agent-week-status{min-width:88px;gap:7px}
 }
+
+/* MNGR v2.4.0 — one compact bottom bar; removes accumulated legacy spacing. */
+@media(max-width:720px){
+  .app{padding:0!important}
+  .workspace{height:100dvh!important;padding-bottom:60px!important}
+  .tabbar{
+    position:fixed!important;
+    inset:auto 0 0 0!important;
+    transform:none!important;
+    width:100vw!important;
+    max-width:none!important;
+    height:56px!important;
+    min-height:56px!important;
+    max-height:56px!important;
+    padding:2px 6px 3px!important;
+    align-items:stretch!important;
+    overflow:hidden!important;
+  }
+  .tabbar .nav-item{
+    width:100%!important;
+    height:50px!important;
+    min-height:50px!important;
+    max-height:50px!important;
+    padding:2px 1px!important;
+    align-content:center!important;
+    gap:1px!important;
+  }
+  .tabbar .tab-icon,.tabbar .tab-icon svg{width:18px!important;height:18px!important}
+  .tabbar .nav-item span{font-size:7px!important;line-height:1!important}
+}
