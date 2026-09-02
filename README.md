@@ -1,6 +1,15 @@
-# MNGR v2.0.1 — Manager Authority
+# MNGR v2.1.0 — Minimal Mobile Manager
 
 Standalone management intelligence for multiple AGNT teams and authorised solo agents.
+
+## v2.1.0 interface refinement
+
+- Rebuilt the iPhone reporting selector as one compact `Viewing` control.
+- Team choices now show only the team name; agent choices show only the agent name.
+- Reduced the fixed bottom navigation height and anchored it directly to the viewport safe area.
+- Removed duplicated mobile headings and secondary copy where the selected scope already provides the context.
+- Flattened mobile cards, tightened spacing and increased visible reporting content without removing functionality.
+- Firebase rules, indexes, authority logic and AGNT application files are unchanged from the working v2.0.1 release.
 
 ## v2.0.1 compatibility fix
 
