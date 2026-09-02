@@ -1,6 +1,17 @@
-# MNGR v2.1.0 — Minimal Mobile Manager
+# MNGR v2.2.0 — AGNT-Cohesive Manager
 
 Standalone management intelligence for multiple AGNT teams and authorised solo agents.
+
+## v2.2.0 decision-first interface
+
+- Rebuilt MNGR on AGNT's light canvas, blue hierarchy, divider-led sections and fixed navigation geometry.
+- Leads with the current management priority, then agents requiring attention and the next seven days of appointments.
+- Reduces the overview snapshot to completion, calls, connect rate and appointments.
+- Limits overdue appointment outcomes to the most recent 28 days so historical records do not overwhelm the current management brief.
+- Sorts the team pulse by lowest current completion first and limits the preview to five agents.
+- Moves reporting period out of the header and into the reporting scope controls.
+- Converts reporting-source errors into a compact data-availability status.
+- Firebase rules, indexes, manager authority and AGNT application files remain unchanged.
 
 ## v2.1.0 interface refinement
 

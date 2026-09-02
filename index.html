@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <meta name="theme-color" content="#08090a">
+  <meta name="theme-color" content="#ffffff">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="MNGR">
   <meta name="description" content="Read-only management intelligence for AGNT teams.">
   <link rel="manifest" href="manifest.json">
@@ -39,7 +39,7 @@
         <button id="showLogin" class="text-button" type="button">Back to sign in</button>
       </form>
       <p id="authMessage" class="form-message" role="alert"></p>
-      <small>Use the AGNT account that owns the team.</small>
+      <small>Managers can create a MNGR account. Team leaders can sign in with their AGNT account.</small>
     </section>
   </main>
 
@@ -55,22 +55,15 @@
   <div id="app" class="app hidden">
     <section class="workspace">
       <header class="topbar">
-        <div>
-          <p id="teamName" class="eyebrow">AGNT TEAM</p>
+        <div class="header-copy">
           <h1 id="pageTitle">Management overview</h1>
+          <p id="teamName" class="header-meta">Live reporting</p>
         </div>
         <div class="topbar-actions">
           <div class="freshness-block" aria-live="polite">
             <span id="dataHealth">Checking access</span>
             <small id="lastUpdated">Waiting for current data</small>
           </div>
-          <label class="period-control">Period
-            <select id="periodSelect">
-              <option value="today">Today</option>
-              <option value="week" selected>This week</option>
-              <option value="four">Last 4 weeks</option>
-            </select>
-          </label>
           <button id="refreshData" class="icon-button" type="button" aria-label="Refresh data" title="Refresh">↻</button>
           <button id="accessButton" class="icon-button access-button" type="button" aria-label="Manage access" title="Manage access">+</button>
           <button id="signOut" class="icon-button signout-button" type="button" aria-label="Sign out" title="Sign out">×</button>
@@ -82,6 +75,13 @@
           <span>Viewing</span>
           <select id="scopeSelect"><option value="all">All Managed</option></select>
         </label>
+        <label class="period-control"><span>Period</span>
+          <select id="periodSelect">
+            <option value="today">Today</option>
+            <option value="week" selected>This week</option>
+            <option value="four">Last 4 weeks</option>
+          </select>
+        </label>
         <small id="scopeMeta" class="scope-meta">Combined reporting</small>
         <span id="scopeTitle" class="visually-hidden">All Managed</span>
       </section>
@@ -91,31 +91,33 @@
       <section id="overviewView" class="view active">
         <div class="command-card">
           <div>
-            <p class="eyebrow">MANAGER BRIEF</p>
+            <p class="eyebrow">PRIORITY NOW</p>
             <h2 id="briefTitle">Your team is loading.</h2>
             <p id="briefCopy">MNGR is confirming live activity and appointment outcomes.</p>
           </div>
           <div class="command-score"><strong id="teamScore">—</strong><span id="scoreLabel">team completion</span></div>
         </div>
 
-        <div id="metricGrid" class="metric-grid"></div>
-
         <div class="dashboard-grid">
-          <section class="panel span-7">
-            <div class="panel-head"><div><p class="eyebrow">ACTIVITY PULSE</p><h2>Performance at a glance</h2></div><button data-go="team" type="button">View detail</button></div>
+          <section class="panel span-12 priority-panel">
+            <div class="panel-head"><div><p class="eyebrow">TEAM PULSE</p><h2>Who needs attention</h2></div><button data-go="team" type="button">View all</button></div>
             <div id="agentPulse" class="agent-pulse"></div>
           </section>
-          <section class="panel span-5">
+          <section class="panel span-12">
             <div class="panel-head"><div><p class="eyebrow">NEXT 7 DAYS</p><h2>Upcoming appointments</h2></div><button data-go="appointments" type="button">View all</button></div>
             <div id="upcomingPreview" class="appointment-list compact"></div>
           </section>
-          <section class="panel span-7">
+        </div>
+
+        <section class="snapshot-section">
+          <div class="panel-head"><div><p class="eyebrow">PERIOD SNAPSHOT</p><h2>Activity into opportunity</h2></div></div>
+          <div id="metricGrid" class="metric-grid"></div>
+        </section>
+
+        <div class="dashboard-grid momentum-grid">
+          <section class="panel span-12">
             <div class="panel-head"><div><p class="eyebrow">MOMENTUM</p><h2>Four-week activity</h2></div><button data-go="trends" type="button">Analyse</button></div>
             <div id="overviewTrend" class="trend-chart"></div>
-          </section>
-          <section class="panel span-5 attention-panel">
-            <div class="panel-head"><div><p class="eyebrow">MANAGER ATTENTION</p><h2>What needs a conversation</h2></div></div>
-            <div id="attentionList" class="attention-list"></div>
           </section>
         </div>
       </section>
