@@ -1,6 +1,6 @@
-# MNGR v1.0.2 — Phase 1 Deployment Candidate
+# MNGR v2.0.0 — Manager Authority
 
-Standalone, read-only management intelligence for AGNT teams.
+Standalone management intelligence for multiple AGNT teams and authorised solo agents.
 
 ## Source boundary
 
@@ -9,9 +9,16 @@ Standalone, read-only management intelligence for AGNT teams.
 - MNGR is its own static PWA and should be hosted separately from AGNT.
 - Firebase Authentication and the existing Firebase project are shared.
 
-## Phase 1 features
+## Manager Authority features
 
-- Verified team-owner access only.
+- Manager account creation using Firebase Authentication.
+- Secure approval links for requesting access to a team or solo agent.
+- Team requests can only be approved by the current verified team owner.
+- Solo-agent requests can only be approved by that agent while they remain outside a team.
+- Explicit, revocable management grants.
+- Portfolio reporting across multiple managed teams and direct agents.
+- Team-level and individual-agent drill-down from one persistent scope selector.
+- Existing team leaders retain automatic reporting access to teams they own.
 - Live team overview and management brief.
 - Today, this-week and four-week accountability totals.
 - Individual agent scorecards and direction of travel.
@@ -23,14 +30,24 @@ Standalone, read-only management intelligence for AGNT teams.
 - Separate booked-date and scheduled-date reporting.
 - Cached reporting with visible freshness and permission state.
 - Unavailable data remains pending rather than appearing as zero.
-- Responsive desktop, tablet and iPhone layouts.
+- iPhone-first installed PWA shell with a locked, non-zooming viewport and safe-area support.
+- AGNT-style fixed bottom navigation for Home, Team, Appointments and Trends.
+- Persistent reporting scope selector for Whole Team or one isolated agent.
+- Agent scope filters activity, appointments, outcomes, trends and coaching prompts together.
+- Centred phone-sized dashboard shell on larger screens.
 - Installable PWA with offline application shell.
 
-## Read-only guarantee
+## AGNT data guarantee
 
-MNGR does not import Firestore write functions and contains no UI that changes AGNT data. Signing in and signing out are the only account actions.
+MNGR never writes AGNT activity, appointments, contacts, leaderboard records, team membership or user profiles.
 
-The supplied Firestore rules add manager **read access only** to:
+MNGR writes only its own access-control metadata:
+
+- `managerProfiles`
+- `managementRequests`
+- `managerAccess/{managerUid}/grants`
+
+The supplied Firestore rules provide manager **read access only** to AGNT reporting data after a valid grant is approved.
 
 - The `days` records of a verified member of the manager's current team, which contain accountability totals and appointments.
 
@@ -49,25 +66,28 @@ All existing AGNT owner-write permissions, team collections and leaderboard perm
 
 1. Create a separate GitHub Pages repository or separate folder/domain for MNGR.
 2. Upload the contents of this package to that location.
-3. Replace the Firebase project's Firestore rules with the included `firestore.rules`, then publish them.
-4. Open MNGR and sign in using the AGNT account that owns the team.
-5. If using a custom domain, add the domain to Firebase Authentication's authorised domains.
+3. Merge and publish the included `firestore.rules` against the currently deployed AGNT rules.
+4. Deploy `firestore.indexes.json` to the same Firebase project.
+5. Open MNGR and create a manager account, or sign in using an existing AGNT team-leader account.
+6. If using a custom domain, add the domain to Firebase Authentication's authorised domains.
 
 Do not deploy these files over the AGNT repository.
 
 ## Firebase changes required
 
-Yes: publish the supplied additive Firestore rules before MNGR can read team-member dated records.
+Yes: publish the supplied rules and indexes before using manager requests and multi-team access.
 
-No data migration, Cloud Functions, Blaze plan, new collection or composite index is required.
+No data migration, Cloud Functions or Blaze plan is required. The included Firestore indexes are required.
 
 ## Files
 
 - `index.html` — application shell and dashboard views
 - `styles.css` — responsive MNGR design system
-- `app.js` — authentication, read-only subscriptions and reporting logic
+- `app.js` — authentication, authority workflow, read-only reporting subscriptions and scope logic
 - `firebase-config.js` — existing Firebase web configuration
-- `firestore.rules` — current AGNT rules plus the scoped MNGR read boundary
+- `firestore.rules` — current AGNT rules plus scoped MNGR authority and reporting access
+- `firestore.indexes.json` — required access-request and approval indexes
+- `SECURITY-MODEL.md` — roles, approval lifecycle and data boundaries
 - `FIREBASE-CHANGE.md` — required Firebase change and deployment check
 - `FIREBASE-AUDIT.md` — AGNT compatibility audit and permission matrix
 - `PRE-DEPLOYMENT-CHECKLIST.md` — staged launch, regression and rollback checks

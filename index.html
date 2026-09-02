@@ -2,7 +2,7 @@
 <html lang="en-AU">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#08090a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -30,6 +30,14 @@
         <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
         <button id="loginButton" class="primary" type="submit">Sign in</button>
       </form>
+      <button id="showSignup" class="text-button" type="button">Create a manager account</button>
+      <form id="signupForm" class="hidden">
+        <label>Name<input id="signupName" type="text" autocomplete="name" required></label>
+        <label>Email<input id="signupEmail" type="email" autocomplete="email" required></label>
+        <label>Password<input id="signupPassword" type="password" autocomplete="new-password" minlength="8" required></label>
+        <button id="signupButton" class="primary" type="submit">Create manager account</button>
+        <button id="showLogin" class="text-button" type="button">Back to sign in</button>
+      </form>
       <p id="authMessage" class="form-message" role="alert"></p>
       <small>Use the AGNT account that owns the team.</small>
     </section>
@@ -45,23 +53,6 @@
   </main>
 
   <div id="app" class="app hidden">
-    <aside class="sidebar">
-      <div class="brand-lockup">
-        <div class="brand-mark"><span>MNGR</span></div>
-        <small>BY AGNT</small>
-      </div>
-      <nav aria-label="Primary navigation">
-        <button class="nav-item active" data-view="overview" type="button"><span>Overview</span><b>01</b></button>
-        <button class="nav-item" data-view="team" type="button"><span>Team</span><b>02</b></button>
-        <button class="nav-item" data-view="appointments" type="button"><span>Appointments</span><b>03</b></button>
-        <button class="nav-item" data-view="trends" type="button"><span>Trends</span><b>04</b></button>
-      </nav>
-      <div class="sidebar-foot">
-        <span id="liveState" class="live-state"><i></i> Connecting</span>
-        <button id="signOut" type="button">Sign out</button>
-      </div>
-    </aside>
-
     <section class="workspace">
       <header class="topbar">
         <div>
@@ -81,8 +72,22 @@
             </select>
           </label>
           <button id="refreshData" class="icon-button" type="button" aria-label="Refresh data" title="Refresh">↻</button>
+          <button id="accessButton" class="icon-button access-button" type="button" aria-label="Manage access" title="Manage access">+</button>
+          <button id="signOut" class="icon-button signout-button" type="button" aria-label="Sign out" title="Sign out">×</button>
         </div>
       </header>
+
+      <section class="scope-bar" aria-label="Reporting scope">
+        <div class="scope-copy">
+          <p class="eyebrow">VIEWING</p>
+          <strong id="scopeTitle">Whole Team</strong>
+          <small id="scopeMeta">Combined team reporting</small>
+        </div>
+        <label class="scope-control">
+          <span>Reporting scope</span>
+          <select id="scopeSelect"><option value="all">All Managed</option></select>
+        </label>
+      </section>
 
       <div id="dataNotice" class="data-notice hidden" role="status"></div>
 
@@ -93,14 +98,14 @@
             <h2 id="briefTitle">Your team is loading.</h2>
             <p id="briefCopy">MNGR is confirming live activity and appointment outcomes.</p>
           </div>
-          <div class="command-score"><strong id="teamScore">—</strong><span>team completion</span></div>
+          <div class="command-score"><strong id="teamScore">—</strong><span id="scoreLabel">team completion</span></div>
         </div>
 
         <div id="metricGrid" class="metric-grid"></div>
 
         <div class="dashboard-grid">
           <section class="panel span-7">
-            <div class="panel-head"><div><p class="eyebrow">TEAM PULSE</p><h2>Performance by agent</h2></div><button data-go="team" type="button">View team</button></div>
+            <div class="panel-head"><div><p class="eyebrow">ACTIVITY PULSE</p><h2>Performance at a glance</h2></div><button data-go="team" type="button">View detail</button></div>
             <div id="agentPulse" class="agent-pulse"></div>
           </section>
           <section class="panel span-5">
@@ -119,7 +124,7 @@
       </section>
 
       <section id="teamView" class="view">
-        <div class="section-intro"><div><p class="eyebrow">INDIVIDUAL ACCOUNTABILITY</p><h2>Team scorecards</h2></div><p>Compare each agent against their own targets and working schedule.</p></div>
+        <div class="section-intro"><div><p class="eyebrow">INDIVIDUAL ACCOUNTABILITY</p><h2>Performance scorecards</h2></div><p>Compare agents or isolate one person against their own targets and working schedule.</p></div>
         <div id="teamCards" class="team-cards"></div>
       </section>
 
@@ -141,12 +146,79 @@
         <div class="section-intro"><div><p class="eyebrow">PROSPECTING TRENDS</p><h2>Activity into opportunity</h2></div><p>Look for repeatable patterns, not one strong or weak day.</p></div>
         <div id="trendSummary" class="metric-grid"></div>
         <div class="dashboard-grid">
-          <section class="panel span-8"><div class="panel-head"><div><p class="eyebrow">LAST 4 WEEKS</p><h2>Team activity trend</h2></div></div><div id="mainTrendChart" class="trend-chart large"></div></section>
+          <section class="panel span-8"><div class="panel-head"><div><p class="eyebrow">LAST 4 WEEKS</p><h2>Activity trend</h2></div></div><div id="mainTrendChart" class="trend-chart large"></div></section>
           <section class="panel span-4"><div class="panel-head"><div><p class="eyebrow">CONVERSION</p><h2>Current ratios</h2></div></div><div id="conversionList" class="conversion-list"></div></section>
           <section class="panel span-12"><div class="panel-head"><div><p class="eyebrow">CONSISTENCY</p><h2>Agent trend table</h2></div></div><div class="table-wrap"><table><thead><tr><th>Agent</th><th>Scheduled days</th><th>Avg completion</th><th>Calls</th><th>Connect rate</th><th>Appointments</th><th>Direction</th></tr></thead><tbody id="trendTable"></tbody></table></div></section>
         </div>
       </section>
     </section>
+
+    <nav class="tabbar" aria-label="Primary navigation">
+      <button class="nav-item active" data-view="overview" type="button">
+        <b class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.25" fill="currentColor" stroke="none"/></svg></b>
+        <span>Home</span>
+      </button>
+      <button class="nav-item" data-view="team" type="button">
+        <b class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8.5" cy="8" r="3"/><circle cx="16.5" cy="9" r="2.5"/><path d="M3.5 19c.4-4 2-6 5-6s4.6 2 5 6M13 14c2.8-.4 5.2 1.2 6.2 4.2"/></svg></b>
+        <span>Team</span>
+      </button>
+      <button class="nav-item" data-view="appointments" type="button">
+        <b class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="15" rx="3"/><path d="M7.5 3.5v4M16.5 3.5v4M3.5 9.5h17M8 13h3M13 13h3M8 17h3"/></svg></b>
+        <span>Appointments</span>
+      </button>
+      <button class="nav-item" data-view="trends" type="button">
+        <b class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 18.5h16M5.5 16l4.25-4.25 3.1 2.8L18.5 8.5M14.5 8.5h4v4"/></svg></b>
+        <span>Trends</span>
+      </button>
+    </nav>
+
+    <section id="accessSheet" class="access-sheet hidden" aria-modal="true" role="dialog" aria-labelledby="accessSheetTitle">
+      <header class="sheet-header">
+        <div><p class="eyebrow">MANAGEMENT AUTHORITY</p><h2 id="accessSheetTitle">Access</h2></div>
+        <button id="closeAccess" class="icon-button" type="button" aria-label="Close access">×</button>
+      </header>
+      <div class="sheet-scroll">
+        <section id="approvalPanel" class="access-panel hidden">
+          <p class="eyebrow">APPROVAL REQUEST</p>
+          <h3 id="approvalTitle">Management access requested</h3>
+          <p id="approvalCopy"></p>
+          <div id="approvalActions" class="access-actions"></div>
+        </section>
+
+        <section id="managerRequestPanel" class="access-panel hidden">
+          <div class="panel-head"><div><p class="eyebrow">REQUEST ACCESS</p><h3>Connect a team or agent</h3></div></div>
+          <p>Create a secure approval link, then send it to the relevant team leader or solo agent.</p>
+          <div class="request-buttons">
+            <button id="requestTeamAccess" class="secondary" type="button">Request a team</button>
+            <button id="requestAgentAccess" class="secondary" type="button">Request a solo agent</button>
+          </div>
+          <div id="newRequestResult" class="request-result hidden"></div>
+        </section>
+
+        <section id="managerActivationPanel" class="access-panel hidden">
+          <p class="eyebrow">MANAGER ACCOUNT</p>
+          <h3>Activate management requests</h3>
+          <p>This enables approval links. It does not provide access to any team or agent by itself.</p>
+          <button id="activateManager" class="primary full-button" type="button">Activate manager tools</button>
+        </section>
+
+        <section class="access-panel">
+          <div class="panel-head"><div><p class="eyebrow">REPORTING ACCESS</p><h3>Teams and agents you can view</h3></div></div>
+          <div id="managedResources" class="access-list"></div>
+        </section>
+
+        <section class="access-panel">
+          <div class="panel-head"><div><p class="eyebrow">AUTHORITY GIVEN</p><h3>Managers you have approved</h3></div></div>
+          <div id="givenApprovals" class="access-list"></div>
+        </section>
+
+        <section id="pendingRequestsPanel" class="access-panel hidden">
+          <div class="panel-head"><div><p class="eyebrow">PENDING</p><h3>Requests awaiting approval</h3></div></div>
+          <div id="pendingRequests" class="access-list"></div>
+        </section>
+      </div>
+    </section>
+    <span id="liveState" class="live-state app-live-state"><i></i> Connecting</span>
   </div>
 
   <script type="module" src="app.js"></script>

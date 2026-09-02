@@ -1,32 +1,30 @@
-# Required Firebase rules change
+# Required Firebase changes
 
-The application code for AGNT remains untouched. MNGR requires one Firebase security extension so the verified team owner can read approved reporting records.
+AGNT application code remains untouched. MNGR v2 requires additive security rules, access-control collections and two indexes.
 
-## What is added
+## New MNGR-only collections
 
-`isManagerOfUser(userId)` verifies all of the following:
+- `managerProfiles/{managerUid}` records that an authenticated account can create access requests.
+- `managementRequests/{requestId}` stores seven-day approval requests.
+- `managerAccess/{managerUid}/grants/{resourceType__resourceId}` stores active or revoked authority.
 
-1. The requester is signed in.
-2. The agent's profile currently identifies a team.
-3. The requester owns that exact team.
-4. The agent is still present in that team's verified member collection.
+These collections do not replace or modify AGNT operational data.
 
-Only then may the requester read `users/{uid}/days/{date}` documents.
+## Reporting permissions added
 
-## What is not added
+An active team grant permits read-only access to the team, its member directory, team leaderboard, team appointments and current members' dated accountability records.
 
-- No manager writes.
-- No manager access to another user's profile document.
-- No access to Prospector state.
-- No access to contacts, MarketPulse or private nested data.
-- No role or membership changes.
-- No change to what agents can read or write.
+An active direct-agent grant permits read-only access to that solo agent's leaderboard and dated accountability records.
 
-## Deployment check
+No manager receives access to user profiles, Prospector, contacts, notes, MarketPulse or AGNT writes.
 
-After publishing the rules:
+## Deployment
 
-- AGNT agents must still load and save their own data normally.
-- A normal team member must not be able to read another member's day document.
-- The team owner must be able to open MNGR and load verified team members.
-- Removing a member from the team must immediately remove the owner's MNGR access to that former member.
+1. Back up the currently deployed Firestore rules.
+2. Compare them with the stable v1.37.5 baseline.
+3. Merge or publish the supplied `firestore.rules` without removing any later intentional production changes.
+4. Deploy `firestore.indexes.json`.
+5. Test the approval workflow with test manager, team leader and solo-agent accounts.
+6. Complete the AGNT regression checklist before production rollout.
+
+No Cloud Function, Admin SDK, Blaze plan or data migration is required.

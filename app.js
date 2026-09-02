@@ -1,6 +1,6 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
-import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut,setPersistence,browserLocalPersistence} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
-import {initializeFirestore,getFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,getDoc,getDocs,query,where,orderBy,startAt,endAt,documentId,onSnapshot} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,updateProfile,signOut,setPersistence,browserLocalPersistence} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
+import {initializeFirestore,getFirestore,persistentLocalCache,persistentMultipleTabManager,collection,collectionGroup,doc,getDoc,getDocs,query,where,orderBy,startAt,endAt,documentId,onSnapshot,setDoc,updateDoc,writeBatch,serverTimestamp,Timestamp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 import {firebaseConfig} from './firebase-config.js';
 
 const firebaseApp=initializeApp(firebaseConfig);
@@ -11,7 +11,7 @@ setPersistence(auth,browserLocalPersistence).catch(()=>{});
 
 const $=selector=>document.querySelector(selector);
 const $$=selector=>[...document.querySelectorAll(selector)];
-const state={user:null,teamId:'',team:null,membership:null,members:[],leaderboard:[],teamAppointments:[],days:new Map(),view:'overview',period:'week',appointmentMode:'upcoming',appointmentAgent:'all',unsubs:[],memberUnsubs:[],sources:{members:'loading',leaderboard:'loading',teamAppointments:'loading',days:new Map(),errors:new Map()},lastUpdated:0};
+const state={user:null,profile:null,agentProfileExists:false,managerProfile:null,ownedResources:[],resources:[],resourceData:new Map(),scopeKey:'all',teamId:'',team:null,membership:null,members:[],leaderboard:[],teamAppointments:[],days:new Map(),view:'overview',period:'week',appointmentMode:'upcoming',appointmentAgent:'all',pendingRequest:null,pendingRequests:[],givenApprovals:[],unsubs:[],memberUnsubs:[],accessUnsubs:[],sources:{resources:new Map(),days:new Map(),errors:new Map()},lastUpdated:0};
 const TYPES=['MAP','LAP','BAP'];
 const TYPE_LABEL={MAP:'Market Appraisal',LAP:'Listing Appointment',BAP:'Buyer Appointment',OFI:'Open for Inspection'};
 
@@ -38,109 +38,119 @@ function appointmentOutcome(a={}){return String(a.outcome||'').trim()}
 function isOutcomeClosed(a={}){return Boolean(appointmentOutcome(a)||a.status==='completed'||a.followedUpAt)}
 function isAppointmentAttention(a={},sourceDate=''){const ts=appointmentTimestamp(a,sourceDate);return ts>0&&ts<Date.now()&&!isOutcomeClosed(a)&&appointmentType(a)!=='OFI'}
 function memberName(uid=''){const live=state.leaderboard.find(item=>item.uid===uid),member=state.members.find(item=>item.uid===uid);return String(live?.name||member?.name||member?.email?.split('@')[0]||'Team member')}
+function scopeType(){return state.scopeKey==='all'?'all':state.scopeKey.split(':')[0]}
+function scopeId(){return state.scopeKey==='all'?'':state.scopeKey.slice(state.scopeKey.indexOf(':')+1)}
+function scopeIsTeam(){return scopeType()!=='agent'}
+function scopedMembers(){return state.members}
+function scopeName(){if(scopeType()==='all')return'All Managed';if(scopeType()==='team')return state.resources.find(resource=>resource.key===state.scopeKey)?.name||'Whole Team';return memberName(scopeId())}
 
 function showOnly(id){['boot','authView','accessView','app'].forEach(name=>$('#'+name)?.classList.toggle('hidden',name!==id))}
-function setLive(label,status=''){$('#liveState').className=`live-state ${status}`;$('#liveState').innerHTML=`<i></i> ${esc(label)}`}
+function setLive(label,status=''){$('#liveState').className=`live-state app-live-state ${status}`;$('#liveState').innerHTML=`<i></i> ${esc(label)}`}
 function setNotice(message=''){const node=$('#dataNotice');node.textContent=message;node.classList.toggle('hidden',!message)}
-function friendlyAuthError(error){const code=String(error?.code||'');if(code.includes('invalid-credential'))return'Email or password is incorrect.';if(code.includes('too-many-requests'))return'Too many attempts. Please wait before trying again.';if(code.includes('network'))return'Check your connection and try again.';return'Could not sign in. Please try again.'}
-function stopSubscriptions(){state.unsubs.splice(0).forEach(unsub=>{try{unsub()}catch{}});state.memberUnsubs.splice(0).forEach(unsub=>{try{unsub()}catch{}});state.members=[];state.leaderboard=[];state.teamAppointments=[];state.days.clear();state.sources={members:'loading',leaderboard:'loading',teamAppointments:'loading',days:new Map(),errors:new Map()};state.lastUpdated=0;boundSignature=''}
+function friendlyAuthError(error){const code=String(error?.code||'');if(code.includes('invalid-credential'))return'Email or password is incorrect.';if(code.includes('email-already-in-use'))return'An account already exists for this email. Sign in instead.';if(code.includes('weak-password'))return'Use a password with at least eight characters.';if(code.includes('too-many-requests'))return'Too many attempts. Please wait before trying again.';if(code.includes('network'))return'Check your connection and try again.';return'Could not complete the account request. Please try again.'}
+function stopSubscriptions(){[state.unsubs,state.memberUnsubs,state.accessUnsubs].forEach(list=>list.splice(0).forEach(unsub=>{try{unsub()}catch{}}));state.profile=null;state.agentProfileExists=false;state.managerProfile=null;state.ownedResources=[];state.resources=[];state.resourceData.clear();state.members=[];state.leaderboard=[];state.teamAppointments=[];state.days.clear();state.scopeKey='all';state.appointmentAgent='all';state.pendingRequest=null;state.pendingRequests=[];state.givenApprovals=[];state.sources={resources:new Map(),days:new Map(),errors:new Map()};state.lastUpdated=0;boundSignature='';resourceSignature=''}
 
-function reportingReady(){return state.sources.members!=='loading'&&state.sources.leaderboard!=='loading'&&state.members.length>0}
+function reportingReady(){const keys=scopeType()==='all'?state.resources.map(resource=>resource.key):scopeType()==='team'?[state.scopeKey]:[...state.resourceData.values()].filter(data=>data.members.some(member=>member.uid===scopeId())).map(data=>data.resource.key),statuses=[...state.sources.resources.entries()].filter(([key])=>keys.some(resourceKey=>key.startsWith(`${resourceKey}:`))).map(([,status])=>status);return state.members.length>0&&!statuses.some(status=>status==='loading')}
 function sourceStatus(key,status,error=null){
-  if(key.startsWith('days:'))state.sources.days.set(key.slice(5),status);else state.sources[key]=status;
+  if(key.startsWith('days:'))state.sources.days.set(key.slice(5),status);else state.sources.resources.set(key,status);
   if(error)state.sources.errors.set(key,error);else state.sources.errors.delete(key);
   if(status==='live')state.lastUpdated=Date.now();
   updateDataHealth();
 }
 function updateDataHealth(){
   const health=$('#dataHealth'),updated=$('#lastUpdated');if(!health||!updated)return;
-  const expected=state.members.map(member=>state.sources.days.get(member.uid)||'loading'),statuses=[state.sources.members,state.sources.leaderboard,state.sources.teamAppointments,...expected],errors=state.sources.errors.size,cached=statuses.some(status=>status==='cached'),loading=statuses.some(status=>status==='loading'),readyDays=expected.filter(status=>status==='live'||status==='cached').length,total=state.members.length;
+  const allMembers=allResourceMembers(),expected=allMembers.map(member=>state.sources.days.get(member.uid)||'loading'),statuses=[...state.sources.resources.values(),...expected],errors=state.sources.errors.size,cached=statuses.some(status=>status==='cached'),loading=statuses.some(status=>status==='loading'),readyDays=expected.filter(status=>status==='live'||status==='cached').length,total=allMembers.length;
   if(errors){health.textContent='Access needs attention';health.className='error';updated.textContent=`${errors} reporting source${errors===1?'':'s'} unavailable`;setLive('Access issue','error');setNotice('Some reporting data could not be loaded. Check the Firebase rules and connection before relying on these figures.');return}
   if(loading){health.textContent=cached?'Cached data · syncing':'Checking access';health.className='warning';updated.textContent=total?`${readyDays} of ${total} agents loaded`:'Waiting for current data';setLive(cached?'Cached':'Connecting',cached?'':'');setNotice(cached?'MNGR is showing verified cached data while the current Firebase connection completes.':'');return}
   health.textContent='Permissions verified';health.className='live';updated.textContent=state.lastUpdated?`Updated ${new Date(state.lastUpdated).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'})}`:'Live';setLive('Live','live');setNotice('');
 }
 
-async function resolveOwnedTeam(user){
-  const profileSnap=await getDoc(doc(db,'users',user.uid));
-  const profile=profileSnap.exists()?profileSnap.data():{};
-  let teamId=String(profile.teamId||'');
-  if(!teamId){
-    const owned=await getDocs(query(collection(db,'teams'),where('ownerUid','==',user.uid)));
-    teamId=owned.docs[0]?.id||'';
-  }
-  if(!teamId)return null;
-  const [teamSnap,memberSnap]=await Promise.all([getDoc(doc(db,'teams',teamId)),getDoc(doc(db,'teams',teamId,'members',user.uid))]);
-  if(!teamSnap.exists()||!memberSnap.exists())return null;
-  const team=teamSnap.data(),membership=memberSnap.data();
-  if(team.ownerUid!==user.uid&&membership.role!=='owner')return null;
-  return{teamId,team:{id:teamId,...team},membership:{uid:user.uid,...membership}};
+function requestIdFromUrl(){return new URLSearchParams(location.search).get('request')||''}
+function managerDisplayName(){return state.managerProfile?.name||state.user?.displayName||state.user?.email?.split('@')[0]||'Manager'}
+function resourceFromGrant(grant){return{key:`${grant.resourceType}:${grant.resourceId}`,type:grant.resourceType,id:grant.resourceId,name:grant.resourceName||`${grant.resourceType==='team'?'Team':'Agent'} access`,access:'grant',grantId:grant.id,grantedByUid:grant.grantedByUid}}
+function mergeResources(grants=[]){const map=new Map(state.ownedResources.map(resource=>[resource.key,resource]));grants.filter(grant=>grant.status==='active').forEach(grant=>map.set(`${grant.resourceType}:${grant.resourceId}`,resourceFromGrant(grant)));state.resources=[...map.values()].sort((a,b)=>(a.type==='team'?-1:1)-(b.type==='team'?-1:1)||a.name.localeCompare(b.name));if(state.scopeKey!=='all'&&!state.resources.some(resource=>resource.key===state.scopeKey)&&!state.scopeKey.startsWith('agent:'))state.scopeKey='all';subscribeReportingResources();renderAccess()}
+
+async function loadOwnedResources(user){
+  const owned=await getDocs(query(collection(db,'teams'),where('ownerUid','==',user.uid)));
+  return owned.docs.map(item=>({key:`team:${item.id}`,type:'team',id:item.id,name:item.data().name||'My Team',access:'owner'}));
 }
 
 async function startManager(user){
   stopSubscriptions();state.user=user;setLive('Confirming access');
   try{
-    const access=await resolveOwnedTeam(user);
-    if(!access){$('#accessMessage').textContent='This account is not the verified owner of an AGNT team.';showOnly('accessView');return}
-    state.teamId=access.teamId;state.team=access.team;state.membership=access.membership;showOnly('app');
-    $('#teamName').textContent=String(state.team.name||'AGNT TEAM').toUpperCase();
-    subscribeCore();
-  }catch(error){console.error(error);$('#accessMessage').textContent=String(error?.code||'').includes('permission-denied')?'Deploy the supplied MNGR Firestore rules before signing in.':'MNGR could not confirm manager access. Check the connection and try again.';showOnly('accessView')}
+    const [profileSnap,managerSnap,ownedResources]=await Promise.all([getDoc(doc(db,'users',user.uid)),getDoc(doc(db,'managerProfiles',user.uid)),loadOwnedResources(user)]);
+    state.profile=profileSnap.exists()?profileSnap.data():{};state.agentProfileExists=profileSnap.exists();state.managerProfile=managerSnap.exists()?managerSnap.data():null;state.ownedResources=ownedResources;showOnly('app');$('#teamName').textContent='MNGR PORTFOLIO';subscribeAccessContext();
+    const requestId=requestIdFromUrl();if(requestId){try{const requestSnap=await getDoc(doc(db,'managementRequests',requestId));state.pendingRequest=requestSnap.exists()?{id:requestSnap.id,...requestSnap.data()}:null}catch(error){console.error(error)}openAccessSheet()}
+  }catch(error){console.error(error);$('#accessMessage').textContent=String(error?.code||'').includes('permission-denied')?'Publish the supplied MNGR Firestore rules before signing in.':'MNGR could not confirm access. Check the connection and try again.';showOnly('accessView')}
 }
 
-function subscribeCore(){
-  setLive('Connecting');
-  const teamId=state.teamId;
-  state.unsubs.push(onSnapshot(collection(db,'teams',teamId,'members'),{includeMetadataChanges:true},snapshot=>{
-    state.members=snapshot.docs.map(item=>({uid:item.id,...item.data()})).sort((a,b)=>(a.role==='owner'?-1:b.role==='owner'?1:0)||memberName(a.uid).localeCompare(memberName(b.uid)));
-    sourceStatus('members',snapshot.metadata.fromCache?'cached':'live');bindMemberData();render();
-  },error=>handleDataError(error,'members')));
-  state.unsubs.push(onSnapshot(collection(db,'teams',teamId,'leaderboard'),{includeMetadataChanges:true},snapshot=>{
-    state.leaderboard=snapshot.docs.map(item=>({uid:item.id,...item.data()}));sourceStatus('leaderboard',snapshot.metadata.fromCache?'cached':'live');render();
-  },error=>handleDataError(error,'leaderboard')));
-  state.unsubs.push(onSnapshot(collection(db,'teams',teamId,'appointments'),{includeMetadataChanges:true},snapshot=>{
-    state.teamAppointments=snapshot.docs.map(item=>({teamAppointmentId:item.id,...item.data(),isTeamAssigned:true}));sourceStatus('teamAppointments',snapshot.metadata.fromCache?'cached':'live');render();
-  },error=>handleDataError(error,'teamAppointments')));
+function subscribeAccessContext(){
+  const uid=state.user.uid;setLive('Connecting');
+  state.accessUnsubs.push(onSnapshot(collection(db,'managerAccess',uid,'grants'),snapshot=>{const grants=snapshot.docs.map(item=>({id:item.id,...item.data()}));mergeResources(grants)},error=>handleDataError(error,'manager-grants')));
+  state.accessUnsubs.push(onSnapshot(query(collection(db,'managementRequests'),where('managerUid','==',uid),where('status','==','pending')),snapshot=>{state.pendingRequests=snapshot.docs.map(item=>({id:item.id,...item.data()}));renderAccess()},error=>handleDataError(error,'pending-requests')));
+  state.accessUnsubs.push(onSnapshot(query(collectionGroup(db,'grants'),where('grantedByUid','==',uid),where('status','==','active')),snapshot=>{state.givenApprovals=snapshot.docs.map(item=>({id:item.id,...item.data()}));renderAccess()},error=>handleDataError(error,'given-approvals')));
+}
+
+let resourceSignature='';
+function subscribeReportingResources(){
+  const signature=state.resources.map(resource=>resource.key).sort().join('|');if(signature===resourceSignature)return;resourceSignature=signature;
+  state.unsubs.splice(0).forEach(unsub=>{try{unsub()}catch{}});state.resourceData.clear();state.sources.resources.clear();[...state.sources.errors.keys()].filter(key=>!key.startsWith('days:')).forEach(key=>state.sources.errors.delete(key));
+  state.resources.forEach(resource=>{
+    if(resource.type==='team'){
+      const data={resource,members:[],leaderboard:[],appointments:[]};state.resourceData.set(resource.key,data);['members','leaderboard','appointments'].forEach(kind=>sourceStatus(`${resource.key}:${kind}`,'loading'));
+      state.unsubs.push(onSnapshot(collection(db,'teams',resource.id,'members'),{includeMetadataChanges:true},snapshot=>{data.members=snapshot.docs.map(item=>({uid:item.id,...item.data(),teamId:resource.id,teamName:resource.name})).sort((a,b)=>(a.role==='owner'?-1:b.role==='owner'?1:0)||String(a.name||a.email||'').localeCompare(String(b.name||b.email||'')));sourceStatus(`${resource.key}:members`,snapshot.metadata.fromCache?'cached':'live');bindMemberData();render()},error=>handleDataError(error,`${resource.key}:members`)));
+      state.unsubs.push(onSnapshot(collection(db,'teams',resource.id,'leaderboard'),{includeMetadataChanges:true},snapshot=>{data.leaderboard=snapshot.docs.map(item=>({uid:item.id,...item.data(),teamId:resource.id}));sourceStatus(`${resource.key}:leaderboard`,snapshot.metadata.fromCache?'cached':'live');render()},error=>handleDataError(error,`${resource.key}:leaderboard`)));
+      state.unsubs.push(onSnapshot(collection(db,'teams',resource.id,'appointments'),{includeMetadataChanges:true},snapshot=>{data.appointments=snapshot.docs.map(item=>({teamAppointmentId:item.id,...item.data(),teamId:resource.id,isTeamAssigned:true}));sourceStatus(`${resource.key}:appointments`,snapshot.metadata.fromCache?'cached':'live');render()},error=>handleDataError(error,`${resource.key}:appointments`)));
+    }else{
+      const member={uid:resource.id,name:resource.name,role:'solo',teamName:'Direct agent'},data={resource,members:[member],leaderboard:[],appointments:[]};state.resourceData.set(resource.key,data);sourceStatus(`${resource.key}:leaderboard`,'loading');
+      state.unsubs.push(onSnapshot(doc(db,'leaderboard',resource.id),{includeMetadataChanges:true},snapshot=>{data.leaderboard=snapshot.exists()?[{uid:snapshot.id,...snapshot.data()}]:[];sourceStatus(`${resource.key}:leaderboard`,snapshot.metadata.fromCache?'cached':'live');bindMemberData();render()},error=>handleDataError(error,`${resource.key}:leaderboard`)));
+    }
+  });
+  bindMemberData();render();
+}
+
+function allResourceMembers(){const map=new Map();state.resourceData.forEach(data=>data.members.forEach(member=>map.set(member.uid,member)));return[...map.values()]}
+function applyScopeData(){
+  let datasets=[...state.resourceData.values()];
+  if(scopeType()==='team')datasets=datasets.filter(data=>data.resource.key===state.scopeKey);
+  const agentUid=scopeType()==='agent'?scopeId():'';
+  const members=new Map(),leaderboard=new Map(),appointments=[];
+  datasets.forEach(data=>{data.members.filter(member=>!agentUid||member.uid===agentUid).forEach(member=>members.set(member.uid,member));data.leaderboard.filter(entry=>!agentUid||entry.uid===agentUid).forEach(entry=>leaderboard.set(entry.uid,entry));appointments.push(...data.appointments)});
+  state.members=[...members.values()];state.leaderboard=[...leaderboard.values()];state.teamAppointments=appointments;state.teamId=scopeType()==='team'?scopeId():'';state.team=scopeType()==='team'?state.resources.find(resource=>resource.key===state.scopeKey):null;
+  $('#teamName').textContent=String(scopeType()==='all'?'MNGR PORTFOLIO':scopeType()==='team'?scopeName():state.members[0]?.teamName||'INDIVIDUAL AGENT').toUpperCase();
 }
 
 let boundSignature='';
 function bindMemberData(){
-  const signature=state.members.map(member=>member.uid).sort().join('|');if(signature===boundSignature)return;boundSignature=signature;
-  state.memberUnsubs.splice(0).forEach(unsub=>{try{unsub()}catch{}});
-  const activeIds=new Set(state.members.map(member=>member.uid));[...state.days.keys()].forEach(uid=>{if(!activeIds.has(uid))state.days.delete(uid)});state.sources.days=new Map(state.members.map(member=>[member.uid,'loading']));[...state.sources.errors.keys()].filter(key=>key.startsWith('days:')).forEach(key=>state.sources.errors.delete(key));
-  const from=dateKey(addDays(new Date(),-42)),to=dateKey(addDays(new Date(),120));
-  state.members.forEach(member=>{
-    const uid=member.uid;
-    const daysQuery=query(collection(db,'users',uid,'days'),orderBy(documentId()),startAt(from),endAt(to));
-    state.memberUnsubs.push(onSnapshot(daysQuery,{includeMetadataChanges:true},snapshot=>{
-      state.days.set(uid,new Map(snapshot.docs.map(item=>[item.id,item.data()])));sourceStatus(`days:${uid}`,snapshot.metadata.fromCache?'cached':'live');render();
-    },error=>handleDataError(error,`days:${uid}`)));
-  });
-  updateDataHealth();
+  const members=allResourceMembers(),signature=members.map(member=>member.uid).sort().join('|');if(signature===boundSignature)return;boundSignature=signature;
+  state.memberUnsubs.splice(0).forEach(unsub=>{try{unsub()}catch{}});const activeIds=new Set(members.map(member=>member.uid));[...state.days.keys()].forEach(uid=>{if(!activeIds.has(uid))state.days.delete(uid)});state.sources.days=new Map(members.map(member=>[member.uid,'loading']));[...state.sources.errors.keys()].filter(key=>key.startsWith('days:')).forEach(key=>state.sources.errors.delete(key));
+  const from=dateKey(addDays(new Date(),-42)),to=dateKey(addDays(new Date(),120));members.forEach(member=>{const uid=member.uid,daysQuery=query(collection(db,'users',uid,'days'),orderBy(documentId()),startAt(from),endAt(to));state.memberUnsubs.push(onSnapshot(daysQuery,{includeMetadataChanges:true},snapshot=>{state.days.set(uid,new Map(snapshot.docs.map(item=>[item.id,item.data()])));sourceStatus(`days:${uid}`,snapshot.metadata.fromCache?'cached':'live');render()},error=>handleDataError(error,`days:${uid}`)))});updateDataHealth();
 }
-function handleDataError(error,source='unknown'){console.error(error);sourceStatus(source,'error',error);if(String(error?.code||'').includes('permission-denied'))setNotice('MNGR could not verify read-only reporting access. Publish the supplied audited Firebase rules before deployment.');}
+function handleDataError(error,source='unknown'){console.error(error);sourceStatus(source,'error',error);if(String(error?.code||'').includes('permission-denied'))setNotice('MNGR could not verify authorised reporting access. Publish the supplied audited Firebase rules before deployment.');}
 
 function leaderboardFor(uid){return state.leaderboard.find(item=>item.uid===uid)||{uid,name:memberName(uid),targets:{calls:50,connects:25,data:10,knock:60},dailyHistory:{},weekHistory:{},appointments:{}}}
 function periodKeys(period=state.period){const now=new Date(),start=period==='today'?now:period==='week'?monday(now):addDays(now,-27),end=now;const keys=[];for(let d=new Date(start);d<=end;d=addDays(d,1))keys.push(dateKey(d));return keys}
 function historyRecords(entry,period=state.period){const keys=new Set(periodKeys(period));const records=[];Object.entries(entry.dailyHistory||{}).forEach(([key,value])=>{if(keys.has(key))records.push({date:key,...value})});if(period==='today'&&entry.date===today()&&!records.some(item=>item.date===today()))records.push({date:today(),calls:entry.calls,connects:entry.connects,data:entry.data,knockMinutes:entry.knockMinutes,score:entry.score,targets:entry.targets,appointments:entry.appointments,appointmentDetails:entry.appointmentDetails});return records.sort((a,b)=>a.date.localeCompare(b.date))}
 function aggregateEntry(entry,period=state.period){const records=historyRecords(entry,period),appointments=records.reduce((total,item)=>total+sum(TYPES,type=>item.appointments?.[type]),0);return{records,calls:sum(records,'calls'),connects:sum(records,'connects'),data:sum(records,'data'),knock:sum(records,'knockMinutes'),score:mean(records,'score'),appointments,scheduledDays:records.length}}
-function teamAggregate(period=state.period){const rows=state.members.map(member=>({member,entry:leaderboardFor(member.uid),aggregate:aggregateEntry(leaderboardFor(member.uid),period)}));return{rows,calls:sum(rows,row=>row.aggregate.calls),connects:sum(rows,row=>row.aggregate.connects),data:sum(rows,row=>row.aggregate.data),knock:sum(rows,row=>row.aggregate.knock),score:mean(rows.filter(row=>row.aggregate.records.length),row=>row.aggregate.score),appointments:sum(rows,row=>row.aggregate.appointments),scheduledDays:sum(rows,row=>row.aggregate.scheduledDays)}}
+function teamAggregate(period=state.period){const rows=scopedMembers().map(member=>({member,entry:leaderboardFor(member.uid),aggregate:aggregateEntry(leaderboardFor(member.uid),period)}));return{rows,calls:sum(rows,row=>row.aggregate.calls),connects:sum(rows,row=>row.aggregate.connects),data:sum(rows,row=>row.aggregate.data),knock:sum(rows,row=>row.aggregate.knock),score:mean(rows.filter(row=>row.aggregate.records.length),row=>row.aggregate.score),appointments:sum(rows,row=>row.aggregate.appointments),scheduledDays:sum(rows,row=>row.aggregate.scheduledDays)}}
 
 function allAppointments(){
   const map=new Map();
   // Add shared assignments first. A matching personal record replaces it below
   // because the personal record carries the authoritative outcome lifecycle.
   state.teamAppointments.forEach(a=>{
-    const agentUid=String(a.assignedToUid||a.setterUid||''),id=String(a.appointmentId||a.teamAppointmentId||''),scheduledDate=appointmentScheduledDate(a,a.createdDate),fallback=[scheduledDate,a.time,a.address,a.contactName,appointmentType(a)].map(value=>String(value||'').trim().toLowerCase()).join('|'),key=id?`id:${id}`:`fallback:${fallback}`;
+    const agentUid=String(a.assignedToUid||a.setterUid||''),id=String(a.appointmentId||a.teamAppointmentId||''),scheduledDate=appointmentScheduledDate(a,a.createdDate),resourceKey=String(a.teamId||'solo'),fallback=[resourceKey,scheduledDate,a.time,a.address,a.contactName,appointmentType(a)].map(value=>String(value||'').trim().toLowerCase()).join('|'),key=id?`id:${resourceKey}:${id}`:`fallback:${fallback}`;
     map.set(key,{...a,id:id||fallback,sourceDate:a.createdDate||scheduledDate,agentUid,agentName:a.assignedToName||memberName(agentUid),scheduledDate,isTeamAssigned:true});
   });
   state.members.forEach(member=>{
     const uid=member.uid,days=state.days.get(uid)||new Map();
     days.forEach((day,sourceDate)=>(Array.isArray(day.appointments)?day.appointments:[]).forEach(a=>{
-      if(appointmentType(a)==='OFI')return;const id=String(a.id||''),scheduledDate=appointmentScheduledDate(a,sourceDate),fallback=[scheduledDate,a.time,a.address,a.contactName,appointmentType(a)].map(value=>String(value||'').trim().toLowerCase()).join('|'),key=id?`id:${id}`:`fallback:${fallback}`,agentUid=String(a.assignedToUid||uid),existing=map.get(key)||{};
+      if(appointmentType(a)==='OFI')return;const id=String(a.id||''),scheduledDate=appointmentScheduledDate(a,sourceDate),resourceKey=String(member.teamId||'solo'),fallback=[resourceKey,scheduledDate,a.time,a.address,a.contactName,appointmentType(a)].map(value=>String(value||'').trim().toLowerCase()).join('|'),key=id?`id:${resourceKey}:${id}`:`fallback:${fallback}`,agentUid=String(a.assignedToUid||uid),existing=map.get(key)||{};
       map.set(key,{...existing,...a,id:id||fallback,sourceDate,agentUid,agentName:a.assignedToName||memberName(agentUid),setterUid:String(a.setterUid||uid),scheduledDate,isTeamAssigned:Boolean(a.assignedToUid&&a.assignedToUid!==uid)||Boolean(existing.isTeamAssigned)});
     }));
   });
-  return[...map.values()].sort((a,b)=>appointmentTimestamp(a,a.sourceDate)-appointmentTimestamp(b,b.sourceDate));
+  const rows=[...map.values()].sort((a,b)=>appointmentTimestamp(a,a.sourceDate)-appointmentTimestamp(b,b.sourceDate));
+  return scopeIsTeam()?rows:rows.filter(a=>a.agentUid===scopeId());
 }
 function appointmentBookedDate(a={}){return a.createdDate||a.logDate||a.sourceDate||''}
 function appointmentsBookedForPeriod(){const keys=new Set(periodKeys());return allAppointments().filter(a=>keys.has(appointmentBookedDate(a)))}
@@ -156,34 +166,42 @@ function renderMetrics(){
   $('#metricGrid').innerHTML=[metricCard('Calls',data.calls,periodLabel),metricCard('Connects',data.connects,`${connectRate}% connect rate`),metricCard('Data',data.data,periodLabel),metricCard('Knocking',`${data.knock}m`,periodLabel),metricCard('Appointments',data.appointments,'booked in period'),metricCard('Needs outcome',attentionAppointments().length,'past appointments',attentionAppointments().length?'attention':'good')].join('');
 }
 function renderBrief(){
+  if(!state.resources.length){$('#teamScore').textContent='—';$('#briefTitle').textContent=state.managerProfile?'Connect your first team or solo agent.':'No reporting authority is active.';$('#briefCopy').textContent=state.managerProfile?'Open Access, create an approval link and send it to the relevant team leader or solo agent.':'Open Access to review or approve a management request.';return}
   if(!reportingReady()){$('#teamScore').textContent='—';$('#briefTitle').textContent='MNGR is confirming current team data.';$('#briefCopy').textContent='Figures will appear once membership, leaderboard and reporting permissions are verified.';return}
   const data=teamAggregate('today'),active=data.rows.filter(row=>row.entry.date===today()&&row.entry.activeToday!==false),atRisk=active.filter(row=>number(row.entry.score)<50),attention=attentionAppointments().length,upcoming=upcomingAppointments(7).length;
   $('#teamScore').textContent=`${data.score}%`;
-  if(!active.length){$('#briefTitle').textContent='The team has no scheduled activity today.';$('#briefCopy').textContent=`There are ${upcoming} appointment${upcoming===1?'':'s'} in the next seven days. Use the space to prepare the next working block.`;return}
+  if(!scopeIsTeam()){
+    const name=scopeName();
+    if(!active.length){$('#briefTitle').textContent=`${name} has no scheduled activity today.`;$('#briefCopy').textContent=`There ${upcoming===1?'is':'are'} ${upcoming} appointment${upcoming===1?'':'s'} in the next seven days for this agent.`;return}
+    if(attention){$('#briefTitle').textContent=`${attention} appointment outcome${attention===1?' needs':'s need'} to be closed for ${name}.`;$('#briefCopy').textContent='Only this agent’s activity and appointments are included in the figures below.';return}
+    if(atRisk.length){$('#briefTitle').textContent=`${name} is currently behind today’s pace.`;$('#briefCopy').textContent='This view is isolated to the selected agent, so the coaching prompt is based only on their logged activity.';return}
+    $('#briefTitle').textContent=`${name} is moving with no urgent outcome gaps.`;$('#briefCopy').textContent=`This view contains only ${name}’s prospecting and appointment data.`;return
+  }
+  if(!active.length){$('#briefTitle').textContent=scopeType()==='all'?'There is no scheduled activity across the portfolio today.':'The team has no scheduled activity today.';$('#briefCopy').textContent=`There are ${upcoming} appointment${upcoming===1?'':'s'} in the next seven days. Use the space to prepare the next working block.`;return}
   if(attention){$('#briefTitle').textContent=`${attention} appointment outcome${attention===1?' needs':'s need'} to be closed.`;$('#briefCopy').textContent=`Activity is visible. The management priority is converting completed appointments into a recorded next step.`;return}
   if(atRisk.length){$('#briefTitle').textContent=`${atRisk.length} agent${atRisk.length===1?' is':'s are'} currently behind today’s pace.`;$('#briefCopy').textContent=`Based on what’s been logged, focus the next coaching conversation on the clearest activity gap.`;return}
-  $('#briefTitle').textContent='The team is moving with no urgent outcome gaps.';$('#briefCopy').textContent=`Keep the current prospecting momentum protected and prepare the next ${upcoming} appointment${upcoming===1?'':'s'} across the team.`;
+  $('#briefTitle').textContent=scopeType()==='all'?'The portfolio is moving with no urgent outcome gaps.':'The team is moving with no urgent outcome gaps.';$('#briefCopy').textContent=`Keep the current prospecting momentum protected and prepare the next ${upcoming} appointment${upcoming===1?'':'s'} across ${scopeType()==='all'?'the portfolio':'the team'}.`;
 }
 function agentStatus(entry){const score=number(entry.score);return score>=75?'on-track':score<40?'off-track':'building'}
 function renderAgentPulse(){
-  const rows=[...state.members].map(member=>{const live=state.leaderboard.find(item=>item.uid===member.uid),entry=live||leaderboardFor(member.uid),current=Boolean(live&&entry.date===today()),score=current?clamp(entry.score):0,status=current?agentStatus(entry):'waiting',meta=!live?'Waiting for current data':entry.activeToday===false?'Not scheduled':current?`${number(entry.calls)} calls · ${number(entry.connects)} connects`:'No current activity published';return`<article class="agent-row ${status}"><div class="agent-name"><strong>${esc(memberName(member.uid))}</strong><small>${esc(meta)}</small></div><div class="progress"><i style="width:${score}%"></i></div><div class="agent-score">${current?`${score}%`:'—'}</div></article>`}).join('');
+  const rows=scopedMembers().map(member=>{const live=state.leaderboard.find(item=>item.uid===member.uid),entry=live||leaderboardFor(member.uid),current=Boolean(live&&entry.date===today()),score=current?clamp(entry.score):0,status=current?agentStatus(entry):'waiting',meta=!live?'Waiting for current data':entry.activeToday===false?'Not scheduled':current?`${number(entry.calls)} calls · ${number(entry.connects)} connects`:'No current activity published';return`<article class="agent-row ${status}"><div class="agent-name"><strong>${esc(memberName(member.uid))}</strong><small>${esc(meta)}</small></div><div class="progress"><i style="width:${score}%"></i></div><div class="agent-score">${current?`${score}%`:'—'}</div></article>`}).join('');
   $('#agentPulse').innerHTML=rows||'<div class="empty">No team members found.</div>';
 }
 function appointmentRow(a,{full=false}={}){const key=a.scheduledDate||appointmentScheduledDate(a,a.sourceDate),type=appointmentType(a),outcome=appointmentOutcome(a),attention=isAppointmentAttention(a,a.sourceDate),time=String(a.time||'12:00'),contact=a.contactName||a.name||'Contact not recorded',address=a.address||'Address not recorded',tag=attention?'Outcome due':outcome||type;return`<article class="appointment-row"><div class="appointment-time"><strong>${esc(formatDate(key,{weekday:true}))}</strong>${esc(time)}</div><div class="appointment-copy"><strong>${esc(contact)}</strong><small>${esc(address)}</small></div>${full?`<div class="appointment-agent">${esc(a.agentName||memberName(a.agentUid))}</div><div class="appointment-outcome"><strong>${esc(outcome||'Outcome not recorded')}</strong><small>${esc(a.followUpDate?`Follow-up ${formatDate(a.followUpDate)}`:attention?'Manager attention':'')}</small></div>`:''}<span class="tag ${attention?'attention':type}">${esc(tag)}</span></article>`}
 function renderUpcomingPreview(){const list=upcomingAppointments(7).slice(0,5);$('#upcomingPreview').innerHTML=list.map(a=>appointmentRow(a)).join('')||'<div class="empty">No upcoming appointments in the next seven days.</div>'}
 function renderAttention(){const attention=attentionAppointments(),todayData=teamAggregate('today'),low=todayData.rows.filter(row=>row.entry.activeToday!==false&&number(row.entry.score)<50),items=[];if(attention.length)items.push({tone:'critical',title:`${attention.length} appointment outcome${attention.length===1?'':'s'} overdue`,copy:'Close the result or set the next follow-up so opportunity is not left open.'});low.slice(0,2).forEach(row=>items.push({tone:'',title:`${firstName(memberName(row.member.uid))} is at ${number(row.entry.score)}% today`,copy:`${number(row.entry.calls)} calls, ${number(row.entry.connects)} connects and ${number(row.entry.data)} data logged.`}));if(!upcomingAppointments(7).length)items.push({tone:'',title:'No appointments in the next seven days',copy:'The next management conversation should focus on converting connects into appointments.'});$('#attentionList').innerHTML=items.map(item=>`<article class="attention-item ${item.tone}"><i></i><div><strong>${esc(item.title)}</strong><small>${esc(item.copy)}</small></div></article>`).join('')||'<div class="empty">No immediate management attention required.</div>'}
 
-function weekBuckets(){const current=monday(),buckets=[];for(let offset=-3;offset<=0;offset++){const start=addDays(current,offset*7),end=addDays(start,6),keys=[];for(let d=new Date(start);d<=end;d=addDays(d,1))keys.push(dateKey(d));let calls=0,appointments=0;state.leaderboard.forEach(entry=>Object.entries(entry.dailyHistory||{}).forEach(([key,record])=>{if(!keys.includes(key))return;calls+=number(record.calls);appointments+=sum(TYPES,type=>record.appointments?.[type])}));buckets.push({label:new Intl.DateTimeFormat('en-AU',{day:'numeric',month:'short'}).format(start),calls,appointments})}return buckets}
+function weekBuckets(){const current=monday(),buckets=[],visibleIds=new Set(scopedMembers().map(member=>member.uid));for(let offset=-3;offset<=0;offset++){const start=addDays(current,offset*7),end=addDays(start,6),keys=[];for(let d=new Date(start);d<=end;d=addDays(d,1))keys.push(dateKey(d));let calls=0,appointments=0;state.leaderboard.filter(entry=>visibleIds.has(entry.uid)).forEach(entry=>Object.entries(entry.dailyHistory||{}).forEach(([key,record])=>{if(!keys.includes(key))return;calls+=number(record.calls);appointments+=sum(TYPES,type=>record.appointments?.[type])}));buckets.push({label:new Intl.DateTimeFormat('en-AU',{day:'numeric',month:'short'}).format(start),calls,appointments})}return buckets}
 function trendMarkup(buckets,large=false){const maxCalls=Math.max(1,...buckets.map(item=>item.calls)),maxAppointments=Math.max(1,...buckets.map(item=>item.appointments)),height=large?235:135;return`${buckets.map(item=>`<div class="trend-column" title="${item.calls} calls · ${item.appointments} appointments"><div class="trend-bars"><i style="height:${Math.max(2,item.calls/maxCalls*height)}px"></i><i style="height:${Math.max(2,item.appointments/maxAppointments*height)}px"></i></div><small>${esc(item.label)}</small></div>`).join('')}<div class="trend-legend" style="position:absolute;left:0;bottom:-25px"><span><i></i>Calls</span><span><i></i>Appointments</span></div>`}
 function renderOverviewTrend(){const node=$('#overviewTrend');node.style.position='relative';node.innerHTML=trendMarkup(weekBuckets())}
 
 function directionFor(entry){const records=Object.entries(entry.dailyHistory||{}).sort(([a],[b])=>a.localeCompare(b)).slice(-20).map(([,value])=>value),half=Math.ceil(records.length/2),prior=mean(records.slice(0,half),'score'),recent=mean(records.slice(half),'score'),diff=recent-prior;return diff>=5?{label:`↑ ${diff}%`,className:'direction-up'}:diff<=-5?{label:`↓ ${Math.abs(diff)}%`,className:'direction-down'}:{label:'→ Steady',className:''}}
 function renderTeamCards(){
-  const period=state.period;$('#teamCards').innerHTML=state.members.map(member=>{const live=state.leaderboard.find(item=>item.uid===member.uid),entry=live||leaderboardFor(member.uid),data=aggregateEntry(entry,period),direction=live?directionFor(entry):{label:'Waiting',className:''},connectRate=data.calls?Math.round(data.connects/data.calls*100):0,meta=!live?'Waiting for current data':member.role==='owner'?'Team owner':data.scheduledDays?`${data.scheduledDays} logged workday${data.scheduledDays===1?'':'s'}`:'No activity in period',display=live?value=>value:()=> '—';return`<article class="team-card"><div class="team-card-head"><div class="team-person"><span class="avatar">${esc(initials(memberName(member.uid)))}</span><div><strong>${esc(memberName(member.uid))}</strong><small>${esc(meta)}</small></div></div><span class="score-ring" style="--score:${live?clamp(data.score)*3.6:0}deg"><b>${live?`${data.score}%`:'—'}</b></span></div><div class="team-metrics"><div><strong>${display(data.calls)}</strong><span>Calls</span></div><div><strong>${display(data.connects)}</strong><span>Connects</span></div><div><strong>${display(data.data)}</strong><span>Data</span></div><div><strong>${display(data.appointments)}</strong><span>Appts</span></div></div><div class="team-card-foot"><span>${live?`${connectRate}% connect rate · ${data.knock}m knocking`:'Current data not yet available'}</span><strong class="${direction.className}">${esc(direction.label)}</strong></div></article>`}).join('')||'<div class="empty">No verified team members found.</div>';
+  const period=state.period;$('#teamCards').innerHTML=scopedMembers().map(member=>{const live=state.leaderboard.find(item=>item.uid===member.uid),entry=live||leaderboardFor(member.uid),data=aggregateEntry(entry,period),direction=live?directionFor(entry):{label:'Waiting',className:''},connectRate=data.calls?Math.round(data.connects/data.calls*100):0,meta=!live?'Waiting for current data':member.role==='owner'?'Team owner':data.scheduledDays?`${data.scheduledDays} logged workday${data.scheduledDays===1?'':'s'}`:'No activity in period',display=live?value=>value:()=> '—';return`<article class="team-card"><div class="team-card-head"><div class="team-person"><span class="avatar">${esc(initials(memberName(member.uid)))}</span><div><strong>${esc(memberName(member.uid))}</strong><small>${esc(meta)}</small></div></div><span class="score-ring" style="--score:${live?clamp(data.score)*3.6:0}deg"><b>${live?`${data.score}%`:'—'}</b></span></div><div class="team-metrics"><div><strong>${display(data.calls)}</strong><span>Calls</span></div><div><strong>${display(data.connects)}</strong><span>Connects</span></div><div><strong>${display(data.data)}</strong><span>Data</span></div><div><strong>${display(data.appointments)}</strong><span>Appts</span></div></div><div class="team-card-foot"><span>${live?`${connectRate}% connect rate · ${data.knock}m knocking`:'Current data not yet available'}</span><strong class="${direction.className}">${esc(direction.label)}</strong></div></article>`}).join('')||'<div class="empty">No verified team members found.</div>';
 }
 
 function renderAppointmentStats(){const booked=appointmentsBookedForPeriod(),scheduled=appointmentsScheduledForPeriod(),upcoming=upcomingAppointments(),completed=recentCompletedAppointments(),attention=attentionAppointments();$('#appointmentStats').innerHTML=[metricCard('Booked',booked.length,'created in period'),metricCard('Scheduled',scheduled.length,'occurring in period'),metricCard('Upcoming',upcoming.length,'next 120 days'),metricCard('Outcomes',completed.length,'recorded in 28 days'),metricCard('Outcome overdue',attention.length,'requires attention',attention.length?'critical':'good')].join('')}
-function renderAppointmentFilters(){const select=$('#appointmentAgentFilter'),value=state.appointmentAgent;select.innerHTML='<option value="all">All agents</option>'+state.members.map(member=>`<option value="${esc(member.uid)}">${esc(memberName(member.uid))}</option>`).join('');select.value=state.members.some(member=>member.uid===value)?value:'all';state.appointmentAgent=select.value}
+function renderAppointmentFilters(){const select=$('#appointmentAgentFilter');if(!scopeIsTeam()){state.appointmentAgent=scopeId();select.innerHTML=`<option value="${esc(scopeId())}">${esc(scopeName())}</option>`;select.value=scopeId();select.disabled=true;return}const value=state.appointmentAgent;select.disabled=false;select.innerHTML='<option value="all">All agents</option>'+state.members.map(member=>`<option value="${esc(member.uid)}">${esc(memberName(member.uid))}</option>`).join('');select.value=state.members.some(member=>member.uid===value)?value:'all';state.appointmentAgent=select.value}
 function renderAppointmentList(){let list=state.appointmentMode==='upcoming'?upcomingAppointments():state.appointmentMode==='outcomes'?recentCompletedAppointments():attentionAppointments();if(state.appointmentAgent!=='all')list=list.filter(a=>a.agentUid===state.appointmentAgent);if(state.appointmentMode!=='upcoming')list=[...list].sort((a,b)=>appointmentTimestamp(b,b.sourceDate)-appointmentTimestamp(a,a.sourceDate));$('#appointmentList').innerHTML=list.map(a=>appointmentRow(a,{full:true})).join('')||`<div class="empty">No ${state.appointmentMode==='upcoming'?'upcoming appointments':state.appointmentMode==='outcomes'?'recorded outcomes':'overdue outcomes'} found.</div>`}
 
 function renderTrends(){
@@ -191,17 +209,71 @@ function renderTrends(){
   $('#trendSummary').innerHTML=[metricCard('Calls',four.calls,'last 4 weeks'),metricCard('Connect rate',`${connectRate}%`,`${four.connects} connects`),metricCard('Appointment rate',`${appointmentRate}%`,'appointments per connect'),metricCard('Data rate',`${dataRate}%`,'data per connect'),metricCard('Avg completion',`${four.score}%`,'logged scheduled days'),metricCard('Knocking',`${four.knock}m`,'last 4 weeks')].join('');
   const chart=$('#mainTrendChart');chart.style.position='relative';chart.innerHTML=trendMarkup(weekBuckets(),true);
   $('#conversionList').innerHTML=[['Connect rate',connectRate,55],['Appointment rate',appointmentRate,20],['Data capture',dataRate,40]].map(([label,value,target])=>`<article class="conversion-item"><div><span>${esc(label)}</span><strong>${value}%</strong></div><div class="progress"><i style="width:${clamp(value/target*100)}%"></i></div></article>`).join('');
-  $('#trendTable').innerHTML=state.members.map(member=>{const entry=leaderboardFor(member.uid),data=aggregateEntry(entry,'four'),direction=directionFor(entry),connect=data.calls?Math.round(data.connects/data.calls*100):0;return`<tr><td>${esc(memberName(member.uid))}</td><td>${data.scheduledDays}</td><td>${data.score}%</td><td>${data.calls}</td><td>${connect}%</td><td>${data.appointments}</td><td class="${direction.className}">${esc(direction.label)}</td></tr>`}).join('');
+  $('#trendTable').innerHTML=scopedMembers().map(member=>{const entry=leaderboardFor(member.uid),data=aggregateEntry(entry,'four'),direction=directionFor(entry),connect=data.calls?Math.round(data.connects/data.calls*100):0;return`<tr><td>${esc(memberName(member.uid))}</td><td>${data.scheduledDays}</td><td>${data.score}%</td><td>${data.calls}</td><td>${connect}%</td><td>${data.appointments}</td><td class="${direction.className}">${esc(direction.label)}</td></tr>`}).join('');
 }
 
-function render(){if($('#app').classList.contains('hidden'))return;renderBrief();renderMetrics();renderAgentPulse();renderUpcomingPreview();renderAttention();renderOverviewTrend();renderTeamCards();renderAppointmentStats();renderAppointmentFilters();renderAppointmentList();renderTrends()}
-function switchView(view){state.view=view;$$('.nav-item').forEach(button=>button.classList.toggle('active',button.dataset.view===view));$$('.view').forEach(node=>node.classList.toggle('active',node.id===`${view}View`));const titles={overview:'Management overview',team:'Team performance',appointments:'Appointment intelligence',trends:'Prospecting trends'};$('#pageTitle').textContent=titles[view]||'MNGR';window.scrollTo({top:0,behavior:'smooth'})}
+function openAccessSheet(){$('#accessSheet').classList.remove('hidden');renderAccess()}
+function closeAccessSheet(){$('#accessSheet').classList.add('hidden')}
+async function copyText(value,button){try{await navigator.clipboard.writeText(value);if(button){const original=button.textContent;button.textContent='Copied';setTimeout(()=>button.textContent=original,1400)}}catch{$('#newRequestResult').classList.remove('hidden');$('#newRequestResult').innerHTML=`<strong>Copy this approval link</strong><p>${esc(value)}</p>`}}
+async function shareRequestLink(id,resourceType,button){const link=requestLink(id),title=`MNGR ${resourceType==='team'?'team':'agent'} access request`;if(navigator.share){try{await navigator.share({title,text:'Open this secure link and sign in to approve management reporting access.',url:link});return}catch(error){if(error?.name==='AbortError')return}}await copyText(link,button)}
+function requestLink(id){const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('request',id);return url.toString()}
+async function createAccessRequest(resourceType){
+  if(!state.managerProfile)return;
+  const requestRef=doc(collection(db,'managementRequests')),expiresAt=Timestamp.fromMillis(Date.now()+7*24*60*60*1000),payload={managerUid:state.user.uid,managerName:managerDisplayName(),managerEmail:state.user.email||'',resourceType,status:'pending',createdAt:serverTimestamp(),expiresAt};
+  try{await setDoc(requestRef,payload);const link=requestLink(requestRef.id),result=$('#newRequestResult');result.classList.remove('hidden');result.innerHTML=`<strong>${resourceType==='team'?'Team leader':'Solo agent'} approval link</strong><p>${esc(link)}</p><button class="secondary" type="button">Share approval link</button>`;result.querySelector('button').addEventListener('click',event=>shareRequestLink(requestRef.id,resourceType,event.currentTarget))}catch(error){console.error(error);setNotice('The access request could not be created. Check the published MNGR rules and try again.')}
+}
+async function activateManagerProfile(){const name=state.profile?.name||state.user.displayName||state.user.email?.split('@')[0]||'Manager';try{await setDoc(doc(db,'managerProfiles',state.user.uid),{uid:state.user.uid,name,email:state.user.email||'',accountType:'manager',createdAt:serverTimestamp()});state.managerProfile={uid:state.user.uid,name,email:state.user.email||'',accountType:'manager'};renderAccess()}catch(error){console.error(error);setNotice('Manager tools could not be activated. Check the published MNGR rules and try again.')}}
+async function approvePendingRequest(resource){
+  const request=state.pendingRequest;if(!request||request.status!=='pending')return;const requestRef=doc(db,'managementRequests',request.id),grantId=`${request.resourceType}__${resource.id}`,grantRef=doc(db,'managerAccess',request.managerUid,'grants',grantId),batch=writeBatch(db),now=serverTimestamp();
+  batch.update(requestRef,{status:'approved',resourceId:resource.id,resourceName:resource.name,grantedByUid:state.user.uid,approvedAt:now});
+  batch.set(grantRef,{managerUid:request.managerUid,managerName:request.managerName||'Manager',managerEmail:request.managerEmail||'',resourceType:request.resourceType,resourceId:resource.id,resourceName:resource.name,grantedByUid:state.user.uid,requestId:request.id,status:'active',grantedAt:now});
+  try{await batch.commit();state.pendingRequest={...request,status:'approved',resourceId:resource.id,resourceName:resource.name};history.replaceState({},'',location.pathname);renderAccess()}catch(error){console.error(error);$('#approvalCopy').textContent='Approval could not be completed. Confirm you are the team owner or the solo agent named in this request.'}
+}
+async function cancelRequest(id){try{await updateDoc(doc(db,'managementRequests',id),{status:'cancelled',cancelledAt:serverTimestamp()})}catch(error){console.error(error);setNotice('The pending request could not be cancelled.')}}
+async function revokeGrant(grant){try{await updateDoc(doc(db,'managerAccess',grant.managerUid||state.user.uid,'grants',grant.id||`${grant.resourceType}__${grant.resourceId}`),{status:'revoked',revokedAt:serverTimestamp(),revokedByUid:state.user.uid})}catch(error){console.error(error);setNotice('Management access could not be revoked. Confirm the current account issued or owns this access.')}}
+function renderApprovalRequest(){
+  const panel=$('#approvalPanel'),request=state.pendingRequest;if(!request){panel.classList.add('hidden');return}panel.classList.remove('hidden');const title=$('#approvalTitle'),copy=$('#approvalCopy'),actions=$('#approvalActions');actions.innerHTML='';
+  if(request.status==='approved'){title.textContent='Access approved';copy.textContent=`${request.managerName||'The manager'} can now view ${request.resourceName||'the approved reporting resource'}.`;return}
+  if(request.status!=='pending'){title.textContent='This request is no longer active';copy.textContent='Ask the manager to create a new approval link if access is still required.';return}
+  title.textContent=`${request.managerName||'A manager'} is requesting access`;copy.textContent=request.resourceType==='team'?'Approve access to one team you lead. The manager will receive read-only reporting visibility across that team.':'Approve access to your individual AGNT reporting. This is available only while you are not part of a team.';
+  if(request.resourceType==='team'){
+    if(!state.ownedResources.length){copy.textContent='This request needs to be opened by the verified leader of the team being managed.';return}
+    state.ownedResources.forEach(resource=>{const button=document.createElement('button');button.className='primary';button.type='button';button.textContent=`Approve ${resource.name}`;button.addEventListener('click',()=>approvePendingRequest(resource));actions.append(button)});
+  }else{
+    const teamId=String(state.profile?.teamId||''),isSolo=state.agentProfileExists&&!teamId&&state.profile?.accountMode!=='team';if(!isSolo){copy.textContent=state.agentProfileExists?'You are currently attached to an AGNT team. The manager must request access from your team leader instead.':'This request must be opened by an existing solo AGNT agent.';return}const resource={id:state.user.uid,name:state.profile?.name||state.user.displayName||state.user.email?.split('@')[0]||'Solo agent'};const button=document.createElement('button');button.className='primary';button.type='button';button.textContent='Approve my reporting';button.addEventListener('click',()=>approvePendingRequest(resource));actions.append(button)
+  }
+}
+function accessRow(title,meta,action='',actionClass=''){return`<article class="access-row"><div class="access-row-copy"><strong>${esc(title)}</strong><small>${esc(meta)}</small></div>${action?`<button class="${actionClass}" type="button">${esc(action)}</button>`:''}</article>`}
+function renderAccess(){
+  if(!state.user)return;renderApprovalRequest();const isManager=Boolean(state.managerProfile);$('#managerRequestPanel').classList.toggle('hidden',!isManager);$('#managerActivationPanel').classList.toggle('hidden',isManager);$('#pendingRequestsPanel').classList.toggle('hidden',!isManager);
+  const resources=$('#managedResources');resources.innerHTML=state.resources.map(resource=>accessRow(resource.name,resource.access==='owner'?'Team leader access':'Approved management access',resource.access==='grant'?'Relinquish':'' ,resource.access==='grant'?'danger':'')).join('')||'<div class="empty-access">No reporting access is active yet.</div>';resources.querySelectorAll('.access-row').forEach((row,index)=>{const resource=state.resources[index];row.querySelector('button')?.addEventListener('click',()=>revokeGrant({...resource,managerUid:state.user.uid,resourceType:resource.type,resourceId:resource.id,id:resource.grantId}))});
+  const approvals=$('#givenApprovals');approvals.innerHTML=state.givenApprovals.map(grant=>accessRow(grant.managerName||grant.managerEmail||'Manager',`${grant.resourceName} · ${grant.resourceType==='team'?'Team access':'Individual access'}`,'Revoke','danger')).join('')||'<div class="empty-access">You have not approved any active managers.</div>';approvals.querySelectorAll('.access-row').forEach((row,index)=>row.querySelector('button')?.addEventListener('click',()=>revokeGrant(state.givenApprovals[index])));
+  const pending=$('#pendingRequests');pending.innerHTML=state.pendingRequests.map(request=>`<article class="access-row"><div class="access-row-copy"><strong>${request.resourceType==='team'?'Team access request':'Solo agent request'}</strong><small>Expires ${request.expiresAt?.toDate?request.expiresAt.toDate().toLocaleDateString('en-AU'):'in 7 days'}</small></div><div class="access-row-actions"><button type="button" data-action="share">Share</button><button class="danger" type="button" data-action="cancel">Cancel</button></div></article>`).join('')||'<div class="empty-access">No requests are awaiting approval.</div>';pending.querySelectorAll('.access-row').forEach((row,index)=>{const request=state.pendingRequests[index],shareButton=row.querySelector('[data-action="share"]');shareButton?.addEventListener('click',()=>shareRequestLink(request.id,request.resourceType,shareButton));row.querySelector('[data-action="cancel"]')?.addEventListener('click',()=>cancelRequest(request.id))});
+}
+
+function renderScopeControl(){
+  const select=$('#scopeSelect'),allMembers=allResourceMembers();
+  if(scopeType()==='agent'&&!allMembers.some(member=>member.uid===scopeId()))state.scopeKey='all';
+  if(scopeType()==='team'&&!state.resources.some(resource=>resource.key===state.scopeKey))state.scopeKey='all';
+  const teamOptions=state.resources.filter(resource=>resource.type==='team').map(resource=>`<option value="${esc(resource.key)}">Team · ${esc(resource.name)}</option>`),agentMap=new Map();state.resourceData.forEach(data=>data.members.forEach(member=>agentMap.set(member.uid,{...member,resourceName:data.resource.name})));const agentOptions=[...agentMap.values()].sort((a,b)=>String(a.name||a.email||'').localeCompare(String(b.name||b.email||''))).map(member=>`<option value="agent:${esc(member.uid)}">Agent · ${esc(member.name||member.email?.split('@')[0]||'Team member')} · ${esc(member.resourceName||member.teamName||'Direct')}</option>`);
+  select.innerHTML='<option value="all">All Managed</option>'+teamOptions.join('')+agentOptions.join('');select.value=state.scopeKey;$('#scopeTitle').textContent=scopeName();
+  const dayStatuses=scopedMembers().map(member=>state.sources.days.get(member.uid)||'loading'),resourceStatuses=[...state.sources.resources.entries()].filter(([key])=>scopeType()==='all'||scopeType()==='team'&&key.startsWith(`${state.scopeKey}:`)||scopeType()==='agent'&&[...state.resourceData.values()].some(data=>data.members.some(member=>member.uid===scopeId())&&key.startsWith(`${data.resource.key}:`))).map(([,status])=>status),statuses=[...resourceStatuses,...dayStatuses],health=state.sources.errors.size?'Access issue':statuses.some(status=>status==='loading')?'Syncing':statuses.some(status=>status==='cached')?'Cached':'Live';
+  const teams=state.resources.filter(resource=>resource.type==='team').length;if(scopeType()==='all')$('#scopeMeta').textContent=`${teams} team${teams===1?'':'s'} · ${state.members.length} agent${state.members.length===1?'':'s'} · ${health}`;else if(scopeType()==='team')$('#scopeMeta').textContent=`${state.members.length} agent${state.members.length===1?'':'s'} · Whole team · ${health}`;else $('#scopeMeta').textContent=`Individual agent only · ${health}`;$('#scoreLabel').textContent=scopeType()==='all'?'portfolio completion':scopeIsTeam()?'team completion':'agent completion';
+}
+function render(){if($('#app').classList.contains('hidden'))return;if(scopeType()==='agent'&&!allResourceMembers().some(member=>member.uid===scopeId()))state.scopeKey='all';if(scopeType()==='team'&&!state.resources.some(resource=>resource.key===state.scopeKey))state.scopeKey='all';applyScopeData();renderScopeControl();renderBrief();renderMetrics();renderAgentPulse();renderUpcomingPreview();renderAttention();renderOverviewTrend();renderTeamCards();renderAppointmentStats();renderAppointmentFilters();renderAppointmentList();renderTrends()}
+function switchView(view){state.view=view;$$('.nav-item').forEach(button=>{const active=button.dataset.view===view;button.classList.toggle('active',active);button.toggleAttribute('aria-current',active)});$$('.view').forEach(node=>node.classList.toggle('active',node.id===`${view}View`));const titles={overview:'Management overview',team:'Performance detail',appointments:'Appointment intelligence',trends:'Prospecting trends'};$('#pageTitle').textContent=titles[view]||'MNGR';const active=$(`#${view}View`);if(active)active.scrollTop=0}
 
 $('#loginForm').addEventListener('submit',async event=>{event.preventDefault();const button=$('#loginButton');button.disabled=true;button.textContent='Signing in…';$('#authMessage').textContent='';try{await signInWithEmailAndPassword(auth,$('#email').value.trim(),$('#password').value)}catch(error){$('#authMessage').textContent=friendlyAuthError(error)}finally{button.disabled=false;button.textContent='Sign in'}});
+$('#signupForm').addEventListener('submit',async event=>{event.preventDefault();const button=$('#signupButton'),name=$('#signupName').value.trim();button.disabled=true;button.textContent='Creating…';$('#authMessage').textContent='';try{const credential=await createUserWithEmailAndPassword(auth,$('#signupEmail').value.trim(),$('#signupPassword').value);await updateProfile(credential.user,{displayName:name});await setDoc(doc(db,'managerProfiles',credential.user.uid),{uid:credential.user.uid,name,email:credential.user.email||'',accountType:'manager',createdAt:serverTimestamp()});await startManager(credential.user);openAccessSheet()}catch(error){console.error(error);$('#authMessage').textContent=friendlyAuthError(error)}finally{button.disabled=false;button.textContent='Create manager account'}});
+$('#showSignup').addEventListener('click',()=>{$('#loginForm').classList.add('hidden');$('#showSignup').classList.add('hidden');$('#signupForm').classList.remove('hidden');$('#authMessage').textContent=''});
+$('#showLogin').addEventListener('click',()=>{$('#signupForm').classList.add('hidden');$('#loginForm').classList.remove('hidden');$('#showSignup').classList.remove('hidden');$('#authMessage').textContent=''});
 $('#signOut').addEventListener('click',()=>signOut(auth));$('#accessSignOut').addEventListener('click',()=>signOut(auth));
+$('#accessButton').addEventListener('click',openAccessSheet);$('#closeAccess').addEventListener('click',closeAccessSheet);$('#requestTeamAccess').addEventListener('click',()=>createAccessRequest('team'));$('#requestAgentAccess').addEventListener('click',()=>createAccessRequest('agent'));
+$('#activateManager').addEventListener('click',activateManagerProfile);
 $$('.nav-item').forEach(button=>button.addEventListener('click',()=>switchView(button.dataset.view)));
 $$('[data-go]').forEach(button=>button.addEventListener('click',()=>switchView(button.dataset.go)));
 $('#periodSelect').addEventListener('change',event=>{state.period=event.target.value;render()});
+$('#scopeSelect').addEventListener('change',event=>{state.scopeKey=event.target.value;state.appointmentAgent=scopeIsTeam()?'all':scopeId();render();const active=$('.view.active');if(active)active.scrollTop=0});
 $('#appointmentAgentFilter').addEventListener('change',event=>{state.appointmentAgent=event.target.value;renderAppointmentList()});
 $$('[data-appointment-mode]').forEach(button=>button.addEventListener('click',()=>{state.appointmentMode=button.dataset.appointmentMode;$$('[data-appointment-mode]').forEach(item=>item.classList.toggle('active',item===button));renderAppointmentList()}));
 $('#refreshData').addEventListener('click',()=>{const button=$('#refreshData');button.classList.add('loading');button.disabled=true;setTimeout(()=>window.location.reload(),180)});

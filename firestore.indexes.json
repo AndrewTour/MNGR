@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "managementRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "managerUid", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "grants",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {"fieldPath": "grantedByUid", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"}
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
