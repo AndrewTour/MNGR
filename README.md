@@ -1,6 +1,17 @@
-# MNGR v2.2.0 — AGNT-Cohesive Manager
+# MNGR v2.3.0 — Weekly Health Manager
 
 Standalone management intelligence for multiple AGNT teams and authorised solo agents.
+
+## v2.3.0 weekly health and shell correction
+
+- Makes weekly agent health the homepage focus with On track, At risk and Off track classifications.
+- Sorts Off track agents first and shows weekly calls, connects and appointments for rapid coaching review.
+- Uses current-week outcome gaps in the homepage priority while retaining the 28-day outcome view inside Appointments.
+- Adds a clear AGNT-style Back control to the Access page.
+- Pins navigation to a fixed 74px bottom bar and removes excess safe-area growth.
+- Reduces side padding and removes the desktop frame borders from the iPhone shell.
+- Corrects team-owner access to current members' dated reporting records, resolving the matching unavailable-source count.
+- AGNT application files and all existing AGNT write permissions remain unchanged.
 
 ## v2.2.0 decision-first interface
 

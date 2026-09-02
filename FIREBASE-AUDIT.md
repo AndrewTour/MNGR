@@ -13,7 +13,7 @@ MNGR writes are restricted to its own manager profile, request and grant documen
 | Data path | AGNT user | Approved team manager | Approved solo-agent manager |
 | --- | --- | --- | --- |
 | `users/{uid}` | Existing own access | Denied | Denied |
-| `users/{uid}/days/{date}` | Existing own access | Current team members, read only | Approved solo agent only, read only |
+| `users/{uid}/days/{date}` | Existing own access | Current team members, read only, for the verified team owner or approved manager | Approved solo agent only, read only |
 | `users/{uid}/prospecting/*` | Existing own access | Denied | Denied |
 | `users/{uid}/marketPulseInbox/*` | Existing own access | Denied | Denied |
 | `leaderboard/{uid}` | Existing own access | No additional legacy access | Approved solo agent only, read only |
@@ -28,7 +28,7 @@ MNGR writes are restricted to its own manager profile, request and grant documen
 - A manager profile does not grant reporting access.
 - Team approval requires the current team owner.
 - Direct-agent approval requires the same signed-in solo agent.
-- Team reads require an active deterministic grant issued by the current team owner.
+- Team reads require either the current verified team owner or an active deterministic grant issued by that owner.
 - Direct-agent reads require an active deterministic grant issued by that agent and automatically fail if the agent joins a team.
 - Grant creation and request approval occur atomically in one batch.
 - Either the grantor or manager can revoke an active grant.

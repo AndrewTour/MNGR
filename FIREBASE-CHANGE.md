@@ -6,6 +6,12 @@ AGNT application code remains untouched. MNGR v2.0.1 requires additive security 
 
 The `teams` match includes an explicit owner-only `allow list` expression. It permits only a signed-in user's `ownerUid == request.auth.uid` team query and expresses the same ownership permission already present for direct reads. It adds no writes and grants no access to another user's team.
 
+## v2.3.0 team-owner reporting correction
+
+MNGR already recognises an AGNT team owner as having automatic access to their own team. The dated-record rule now recognises that same verified ownership when reading a current member's `users/{uid}/days` reporting records. Previously, those reads required a separate manager grant, which caused one unavailable source for every member when the team owner used MNGR directly.
+
+This is read-only and limited to current verified members of the owner's team. It adds no AGNT writes and does not expose profiles, Prospector, contacts, notes or another team's data.
+
 ## New MNGR-only collections
 
 - `managerProfiles/{managerUid}` records that an authenticated account can create access requests.

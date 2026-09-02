@@ -28,7 +28,7 @@
 
 ## Reporting visibility
 
-An active team grant allows read-only access to:
+A verified team owner, or a manager with an active team grant, receives read-only access to:
 
 - team metadata;
 - team membership;

@@ -62,7 +62,7 @@ service cloud.firestore {
           (userData.keys().hasAny(['teamId'])
             && userData.teamId is string
             && userData.teamId != ''
-            && hasActiveTeamManagerGrant(userData.teamId)
+            && (isTeamOwner(userData.teamId) || hasActiveTeamManagerGrant(userData.teamId))
             && exists(/databases/$(database)/documents/teams/$(userData.teamId)/members/$(userId)))
         );
     }

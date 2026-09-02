@@ -216,3 +216,27 @@ td{color:var(--text)}
   .command-card h2{font-size:22px}
   .command-score strong{font-size:39px}
 }
+
+/* MNGR v2.3.0 — true viewport shell, weekly health and secondary back navigation. */
+html,body{width:100vw!important;height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important}
+body{inset:0!important}
+.app{inset:0!important;width:100vw!important;max-width:560px!important;height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important;border:0!important;box-shadow:none!important}
+.workspace{width:100%!important;padding-left:12px!important;padding-right:12px!important;padding-bottom:80px!important}
+.agent-row{grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:13px 0}
+.agent-week-status{min-width:94px;display:flex;align-items:center;justify-content:flex-end;gap:9px}
+.agent-week-status span{min-width:58px;padding:5px 7px;border-radius:999px;background:var(--surface-2);color:var(--muted);font-size:8px;font-weight:800;line-height:1;text-align:center;text-transform:uppercase;letter-spacing:.07em}
+.agent-week-status strong{min-width:30px;color:var(--text);font-size:13px;font-weight:760;text-align:right}
+.week-on-track .agent-week-status span{background:#e9f7f1;color:var(--green)}
+.week-at-risk .agent-week-status span{background:#fff4db;color:#9b6a13}
+.week-off-track .agent-week-status span{background:#fdecef;color:var(--red)}
+.week-no-data .agent-week-status span{background:#f1f2f4;color:var(--muted)}
+.tabbar{position:fixed!important;left:50%!important;right:auto!important;bottom:0!important;width:100%!important;max-width:560px!important;height:74px!important;min-height:74px!important;max-height:74px!important;padding:5px 8px 7px!important;overflow:hidden!important;transform:translateX(-50%)!important}
+.tabbar .nav-item{height:61px!important;min-height:61px!important;max-height:61px!important;padding:4px 1px!important}
+.sheet-header{position:relative;min-height:calc(118px + env(safe-area-inset-top));padding:calc(12px + env(safe-area-inset-top)) 14px 14px;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:13px;background:#fff}
+.sheet-back{display:inline-flex;align-items:center;gap:4px;padding:0;border:0;background:transparent;color:var(--blue);font-size:13px;font-weight:700;cursor:pointer}
+.sheet-back span{display:block;margin-top:-2px;font-size:27px;font-weight:450;line-height:.6}
+
+@media(max-width:390px){
+  .workspace{padding-left:10px!important;padding-right:10px!important}
+  .agent-week-status{min-width:88px;gap:7px}
+}
