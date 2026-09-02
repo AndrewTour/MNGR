@@ -78,10 +78,11 @@ async function loadOwnedResources(user){
 async function startManager(user){
   stopSubscriptions();state.user=user;setLive('Confirming access');
   try{
-    const [profileSnap,managerSnap,ownedResources]=await Promise.all([getDoc(doc(db,'users',user.uid)),getDoc(doc(db,'managerProfiles',user.uid)),loadOwnedResources(user)]);
+    const tagged=(source,promise)=>promise.catch(error=>{try{error.mngrSource=source}catch{}throw error});
+    const [profileSnap,managerSnap,ownedResources]=await Promise.all([tagged('profile',getDoc(doc(db,'users',user.uid))),tagged('manager-profile',getDoc(doc(db,'managerProfiles',user.uid))),tagged('owned-teams',loadOwnedResources(user))]);
     state.profile=profileSnap.exists()?profileSnap.data():{};state.agentProfileExists=profileSnap.exists();state.managerProfile=managerSnap.exists()?managerSnap.data():null;state.ownedResources=ownedResources;showOnly('app');$('#teamName').textContent='MNGR PORTFOLIO';subscribeAccessContext();
     const requestId=requestIdFromUrl();if(requestId){try{const requestSnap=await getDoc(doc(db,'managementRequests',requestId));state.pendingRequest=requestSnap.exists()?{id:requestSnap.id,...requestSnap.data()}:null}catch(error){console.error(error)}openAccessSheet()}
-  }catch(error){console.error(error);$('#accessMessage').textContent=String(error?.code||'').includes('permission-denied')?'Publish the supplied MNGR Firestore rules before signing in.':'MNGR could not confirm access. Check the connection and try again.';showOnly('accessView')}
+  }catch(error){console.error(error);const denied=String(error?.code||'').includes('permission-denied');$('#accessMessage').textContent=denied&&error?.mngrSource==='owned-teams'?'MNGR could not read your owned-team list. Publish the query-safe MNGR v2.0.1 rule update, then reopen the app.':denied?'Firebase denied one of MNGR’s startup checks. Confirm the v2.0.1 rules are deployed to the same Firebase project as this app.':'MNGR could not confirm access. Check the connection and try again.';showOnly('accessView')}
 }
 
 function subscribeAccessContext(){

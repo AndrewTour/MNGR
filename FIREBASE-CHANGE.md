@@ -1,6 +1,10 @@
 # Required Firebase changes
 
-AGNT application code remains untouched. MNGR v2 requires additive security rules, access-control collections and two indexes.
+AGNT application code remains untouched. MNGR v2.0.1 requires additive security rules, access-control collections and two indexes.
+
+## v2.0.1 query-safe owner read
+
+The `teams` match includes an explicit owner-only `allow list` expression. It permits only a signed-in user's `ownerUid == request.auth.uid` team query and expresses the same ownership permission already present for direct reads. It adds no writes and grants no access to another user's team.
 
 ## New MNGR-only collections
 

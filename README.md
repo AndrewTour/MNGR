@@ -1,6 +1,12 @@
-# MNGR v2.0.0 — Manager Authority
+# MNGR v2.0.1 — Manager Authority
 
 Standalone management intelligence for multiple AGNT teams and authorised solo agents.
+
+## v2.0.1 compatibility fix
+
+- Makes the existing team-owner read permission provable to Firestore when MNGR queries a signed-in team leader's owned teams.
+- Replaces the misleading generic “rules not published” startup warning with a precise access-check message.
+- Does not change AGNT application code, AGNT writes, team membership or manager authority boundaries.
 
 ## Source boundary
 

@@ -99,6 +99,11 @@ service cloud.firestore {
                     && request.resource.data.joinEnabled == true
                     && request.resource.data.joinCode is string;
       allow read: if isTeamMember(teamId) || isTeamOwner(teamId) || hasActiveTeamManagerGrant(teamId);
+      // Firestore collection queries must be provable from the query itself.
+      // MNGR uses `where('ownerUid', '==', request.auth.uid)` to discover every
+      // team led by the signed-in user. This is the query-safe expression of
+      // the same owner-only read already granted above.
+      allow list: if signedIn() && resource.data.ownerUid == request.auth.uid;
       allow update: if isTeamOwner(teamId)
                     && request.resource.data.ownerUid == resource.data.ownerUid;
       allow delete: if isTeamOwner(teamId);
