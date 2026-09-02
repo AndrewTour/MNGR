@@ -1,6 +1,12 @@
-# MNGR v2.6.0 — Release Coherence
+# MNGR v2.6.1 — AGNT Navigation Match
 
 Standalone management intelligence for multiple AGNT teams and authorised solo agents.
+
+## v2.6.1 AGNT navigation match
+
+- Matches the confirmed AGNT stable build's 72px navigation height, 52px tab targets, 20px icons, label sizing and iPhone safe-area spacing.
+- Preserves MNGR's four navigation destinations and existing active colour.
+- Makes no changes to reporting logic, Firebase or AGNT.
 
 ## v2.6.0 release coherence
 

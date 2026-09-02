@@ -1,7 +1,7 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,updateProfile,signOut,setPersistence,browserLocalPersistence} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {initializeFirestore,getFirestore,persistentLocalCache,persistentMultipleTabManager,collection,collectionGroup,doc,getDoc,getDocs,query,where,orderBy,startAt,endAt,documentId,onSnapshot,setDoc,updateDoc,writeBatch,serverTimestamp,Timestamp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
-import {firebaseConfig} from './firebase-config.js?v=2.6.0';
+import {firebaseConfig} from './firebase-config.js?v=2.6.1';
 
 const firebaseApp=initializeApp(firebaseConfig);
 const auth=getAuth(firebaseApp);
@@ -306,4 +306,4 @@ $$('[data-appointment-mode]').forEach(button=>button.addEventListener('click',()
 $('#refreshData').addEventListener('click',()=>{const button=$('#refreshData');button.classList.add('loading');button.disabled=true;setTimeout(()=>window.location.reload(),180)});
 
 onAuthStateChanged(auth,user=>{if(user)startManager(user);else{stopSubscriptions();state.user=null;state.teamId='';state.team=null;boundSignature='';showOnly('authView')}});
-if('serviceWorker'in navigator)window.addEventListener('load',async()=>{const reloadOnce=()=>{const key='mngr:controller-reload:2.6.0';if(sessionStorage.getItem(key))return;sessionStorage.setItem(key,'1');location.reload()};navigator.serviceWorker.addEventListener('controllerchange',reloadOnce);try{const registration=await navigator.serviceWorker.register('./service-worker.js?v=2.6.0',{updateViaCache:'none'});await registration.update()}catch(error){console.error(error)}});
+if('serviceWorker'in navigator)window.addEventListener('load',async()=>{const reloadOnce=()=>{const key='mngr:controller-reload:2.6.1';if(sessionStorage.getItem(key))return;sessionStorage.setItem(key,'1');location.reload()};navigator.serviceWorker.addEventListener('controllerchange',reloadOnce);try{const registration=await navigator.serviceWorker.register('./service-worker.js?v=2.6.1',{updateViaCache:'none'});await registration.update()}catch(error){console.error(error)}});
