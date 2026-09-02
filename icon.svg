@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#08090a"/>
+  <path d="M100 126h312v260H100z" fill="none" stroke="#292c31" stroke-width="6"/>
+  <path d="M100 190h312M100 322h312" stroke="#292c31" stroke-width="6"/>
+  <text x="256" y="278" fill="#f5f5f2" font-family="Arial,Helvetica,sans-serif" font-size="92" font-weight="700" text-anchor="middle" letter-spacing="-5">MNGR</text>
+  <circle cx="406" cy="105" r="18" fill="#ff6b2c"/>
+</svg>

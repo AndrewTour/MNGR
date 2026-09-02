@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#08090a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MNGR">
+  <meta name="description" content="Read-only management intelligence for AGNT teams.">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <title>MNGR</title>
+</head>
+<body>
+  <div id="boot" class="boot" aria-live="polite">
+    <div class="brand-mark"><span>MNGR</span></div>
+    <p>Loading management intelligence…</p>
+  </div>
+
+  <main id="authView" class="auth-view hidden">
+    <section class="auth-card">
+      <div class="brand-mark large"><span>MNGR</span></div>
+      <p class="eyebrow">AGNT MANAGEMENT</p>
+      <h1>See the work.<br>Coach the outcome.</h1>
+      <p class="auth-intro">A read-only view of team accountability, prospecting momentum and appointment outcomes.</p>
+      <form id="loginForm">
+        <label>Email<input id="email" type="email" autocomplete="username" required></label>
+        <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
+        <button id="loginButton" class="primary" type="submit">Sign in</button>
+      </form>
+      <p id="authMessage" class="form-message" role="alert"></p>
+      <small>Use the AGNT account that owns the team.</small>
+    </section>
+  </main>
+
+  <main id="accessView" class="access-view hidden">
+    <section class="auth-card">
+      <p class="eyebrow">ACCESS REQUIRED</p>
+      <h1>Manager access isn’t active.</h1>
+      <p id="accessMessage" class="auth-intro">MNGR is available to the verified owner of an AGNT team.</p>
+      <button id="accessSignOut" class="secondary" type="button">Sign out</button>
+    </section>
+  </main>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand-lockup">
+        <div class="brand-mark"><span>MNGR</span></div>
+        <small>BY AGNT</small>
+      </div>
+      <nav aria-label="Primary navigation">
+        <button class="nav-item active" data-view="overview" type="button"><span>Overview</span><b>01</b></button>
+        <button class="nav-item" data-view="team" type="button"><span>Team</span><b>02</b></button>
+        <button class="nav-item" data-view="appointments" type="button"><span>Appointments</span><b>03</b></button>
+        <button class="nav-item" data-view="trends" type="button"><span>Trends</span><b>04</b></button>
+      </nav>
+      <div class="sidebar-foot">
+        <span id="liveState" class="live-state"><i></i> Connecting</span>
+        <button id="signOut" type="button">Sign out</button>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div>
+          <p id="teamName" class="eyebrow">AGNT TEAM</p>
+          <h1 id="pageTitle">Management overview</h1>
+        </div>
+        <div class="topbar-actions">
+          <div class="freshness-block" aria-live="polite">
+            <span id="dataHealth">Checking access</span>
+            <small id="lastUpdated">Waiting for current data</small>
+          </div>
+          <label class="period-control">Period
+            <select id="periodSelect">
+              <option value="today">Today</option>
+              <option value="week" selected>This week</option>
+              <option value="four">Last 4 weeks</option>
+            </select>
+          </label>
+          <button id="refreshData" class="icon-button" type="button" aria-label="Refresh data" title="Refresh">↻</button>
+        </div>
+      </header>
+
+      <div id="dataNotice" class="data-notice hidden" role="status"></div>
+
+      <section id="overviewView" class="view active">
+        <div class="command-card">
+          <div>
+            <p class="eyebrow">MANAGER BRIEF</p>
+            <h2 id="briefTitle">Your team is loading.</h2>
+            <p id="briefCopy">MNGR is confirming live activity and appointment outcomes.</p>
+          </div>
+          <div class="command-score"><strong id="teamScore">—</strong><span>team completion</span></div>
+        </div>
+
+        <div id="metricGrid" class="metric-grid"></div>
+
+        <div class="dashboard-grid">
+          <section class="panel span-7">
+            <div class="panel-head"><div><p class="eyebrow">TEAM PULSE</p><h2>Performance by agent</h2></div><button data-go="team" type="button">View team</button></div>
+            <div id="agentPulse" class="agent-pulse"></div>
+          </section>
+          <section class="panel span-5">
+            <div class="panel-head"><div><p class="eyebrow">NEXT 7 DAYS</p><h2>Upcoming appointments</h2></div><button data-go="appointments" type="button">View all</button></div>
+            <div id="upcomingPreview" class="appointment-list compact"></div>
+          </section>
+          <section class="panel span-7">
+            <div class="panel-head"><div><p class="eyebrow">MOMENTUM</p><h2>Four-week activity</h2></div><button data-go="trends" type="button">Analyse</button></div>
+            <div id="overviewTrend" class="trend-chart"></div>
+          </section>
+          <section class="panel span-5 attention-panel">
+            <div class="panel-head"><div><p class="eyebrow">MANAGER ATTENTION</p><h2>What needs a conversation</h2></div></div>
+            <div id="attentionList" class="attention-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="teamView" class="view">
+        <div class="section-intro"><div><p class="eyebrow">INDIVIDUAL ACCOUNTABILITY</p><h2>Team scorecards</h2></div><p>Compare each agent against their own targets and working schedule.</p></div>
+        <div id="teamCards" class="team-cards"></div>
+      </section>
+
+      <section id="appointmentsView" class="view">
+        <div class="section-intro"><div><p class="eyebrow">APPOINTMENT INTELLIGENCE</p><h2>Upcoming and outcomes</h2></div><p>Booked opportunity is only useful when the next outcome is clear.</p></div>
+        <div id="appointmentStats" class="metric-grid appointment-metrics"></div>
+        <div class="appointment-controls">
+          <div class="segmented" role="group" aria-label="Appointment view">
+            <button class="active" data-appointment-mode="upcoming" type="button">Upcoming</button>
+            <button data-appointment-mode="outcomes" type="button">Outcomes</button>
+            <button data-appointment-mode="attention" type="button">Needs attention</button>
+          </div>
+          <select id="appointmentAgentFilter" aria-label="Filter appointments by agent"><option value="all">All agents</option></select>
+        </div>
+        <div id="appointmentList" class="appointment-list full"></div>
+      </section>
+
+      <section id="trendsView" class="view">
+        <div class="section-intro"><div><p class="eyebrow">PROSPECTING TRENDS</p><h2>Activity into opportunity</h2></div><p>Look for repeatable patterns, not one strong or weak day.</p></div>
+        <div id="trendSummary" class="metric-grid"></div>
+        <div class="dashboard-grid">
+          <section class="panel span-8"><div class="panel-head"><div><p class="eyebrow">LAST 4 WEEKS</p><h2>Team activity trend</h2></div></div><div id="mainTrendChart" class="trend-chart large"></div></section>
+          <section class="panel span-4"><div class="panel-head"><div><p class="eyebrow">CONVERSION</p><h2>Current ratios</h2></div></div><div id="conversionList" class="conversion-list"></div></section>
+          <section class="panel span-12"><div class="panel-head"><div><p class="eyebrow">CONSISTENCY</p><h2>Agent trend table</h2></div></div><div class="table-wrap"><table><thead><tr><th>Agent</th><th>Scheduled days</th><th>Avg completion</th><th>Calls</th><th>Connect rate</th><th>Appointments</th><th>Direction</th></tr></thead><tbody id="trendTable"></tbody></table></div></section>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
