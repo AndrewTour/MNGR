@@ -270,3 +270,62 @@ body{inset:0!important}
   .tabbar .tab-icon,.tabbar .tab-icon svg{width:18px!important;height:18px!important}
   .tabbar .nav-item span{font-size:7px!important;line-height:1!important}
 }
+
+/* MNGR v2.5.0 — lower navigation, contained stacks and mobile trend rows. */
+.workspace>*,.view,.dashboard-grid,.panel,.metric-grid,.team-card,.appointment-row,.conversion-list,.table-wrap{min-width:0;max-width:100%}
+.panel,.metric-grid,.team-card,.appointment-list.full,.conversion-list{overflow:hidden}
+.appointment-copy,.appointment-agent,.appointment-outcome{min-width:0;overflow-wrap:anywhere}
+.team-card-foot{flex-wrap:wrap}
+.trend-chart{position:relative!important;height:164px;padding:10px 0 27px;overflow:hidden}
+.trend-chart.large{height:210px}
+.trend-column{height:100%;min-width:0}
+.trend-bars{height:calc(100% - 20px);min-height:0}
+.trend-bars i{max-height:100%}
+.trend-legend{position:absolute;left:0;bottom:2px;margin:0}
+.mobile-trend-meta{display:none}
+
+@media(max-width:720px){
+  .workspace{padding-bottom:49px!important}
+  .tabbar{
+    height:45px!important;
+    min-height:45px!important;
+    max-height:45px!important;
+    padding:1px 6px 2px!important;
+  }
+  .tabbar .nav-item{
+    height:41px!important;
+    min-height:41px!important;
+    max-height:41px!important;
+    padding:1px!important;
+    gap:0!important;
+  }
+  .tabbar .tab-icon,.tabbar .tab-icon svg{width:17px!important;height:17px!important}
+  .tabbar .nav-item span{font-size:6.7px!important}
+  .table-wrap{width:100%;overflow:hidden}
+  .table-wrap table{width:100%;table-layout:fixed;white-space:normal}
+  .table-wrap thead{display:none}
+  .table-wrap tbody,.table-wrap tr{display:block;width:100%}
+  .table-wrap tr{padding:13px 0;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;border-top:1px solid var(--line-soft)}
+  .table-wrap tr:first-child{border-top:0}
+  .table-wrap td{min-width:0;padding:0;border:0}
+  .table-wrap td:first-child strong{display:block;font-size:13px}
+  .table-wrap td:nth-child(3){font-size:18px;font-weight:760;text-align:right}
+  .table-wrap td:not(:first-child):not(:nth-child(3)){display:none}
+  .mobile-trend-meta{display:block;margin-top:4px;color:var(--muted);font-size:9px;font-weight:450;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
+}
+
+/* MNGR v2.6.0 — coherent release assets, truthful chart scales and clean viewport edges. */
+.panel-head{position:relative;z-index:2}
+.panel-head+.trend-chart{clear:both;margin-top:4px}
+.trend-chart{z-index:1;height:142px;padding:12px 0 28px}
+.trend-chart.large{height:168px}
+#trendSummary{position:relative;z-index:1;margin-bottom:16px}
+.conversion-item span small{display:block;margin-top:4px;color:var(--faint);font-size:9px;font-weight:500}
+.week-syncing .agent-week-status span{background:#f1f2f4;color:var(--muted)}
+.appointment-list.compact{padding-bottom:8px}
+
+@media(max-width:720px){
+  .view{padding-bottom:68px!important;scroll-padding-bottom:68px}
+  .tabbar .nav-item{transform:translateY(2px)}
+  .trend-chart.large{height:168px}
+}
