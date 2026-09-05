@@ -8,9 +8,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="MNGR">
   <meta name="description" content="Read-only management intelligence for AGNT teams.">
+  <meta name="mngr-version" content="2.6.1">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2.6.1">
   <title>MNGR</title>
 </head>
 <body>
@@ -100,23 +101,23 @@
 
         <div class="dashboard-grid">
           <section class="panel span-12 priority-panel">
-            <div class="panel-head"><div><p class="eyebrow">THIS WEEK</p><h2>Agent health</h2></div><button data-go="team" type="button">View all</button></div>
+            <div class="panel-head"><div><p id="agentHealthPeriod" class="eyebrow">THIS WEEK</p><h2>Agent health</h2></div><button data-go="team" type="button">View all</button></div>
             <div id="agentPulse" class="agent-pulse"></div>
           </section>
           <section class="panel span-12">
-            <div class="panel-head"><div><p class="eyebrow">NEXT 7 DAYS</p><h2>Upcoming appointments</h2></div><button data-go="appointments" type="button">View all</button></div>
+            <div class="panel-head"><div><p id="upcomingPeriod" class="eyebrow">UPCOMING · THIS WEEK</p><h2>Upcoming appointments</h2></div><button data-go="appointments" type="button">View all</button></div>
             <div id="upcomingPreview" class="appointment-list compact"></div>
           </section>
         </div>
 
         <section class="snapshot-section">
-          <div class="panel-head"><div><p class="eyebrow">PERIOD SNAPSHOT</p><h2>Activity into opportunity</h2></div></div>
+          <div class="panel-head"><div><p id="snapshotPeriod" class="eyebrow">THIS WEEK SNAPSHOT</p><h2>Activity into opportunity</h2></div></div>
           <div id="metricGrid" class="metric-grid"></div>
         </section>
 
         <div class="dashboard-grid momentum-grid">
           <section class="panel span-12">
-            <div class="panel-head"><div><p class="eyebrow">MOMENTUM</p><h2>Four-week activity</h2></div><button data-go="trends" type="button">Analyse</button></div>
+            <div class="panel-head"><div><p id="momentumPeriod" class="eyebrow">THIS WEEK</p><h2>Activity trend</h2></div><button data-go="trends" type="button">Analyse</button></div>
             <div id="overviewTrend" class="trend-chart"></div>
           </section>
         </div>
@@ -145,7 +146,7 @@
         <div class="section-intro"><div><p class="eyebrow">PROSPECTING TRENDS</p><h2>Activity into opportunity</h2></div><p>Look for repeatable patterns, not one strong or weak day.</p></div>
         <div id="trendSummary" class="metric-grid"></div>
         <div class="dashboard-grid">
-          <section class="panel span-8"><div class="panel-head"><div><p class="eyebrow">LAST 4 WEEKS</p><h2>Activity trend</h2></div></div><div id="mainTrendChart" class="trend-chart large"></div></section>
+          <section class="panel span-8"><div class="panel-head"><div><p id="trendPeriod" class="eyebrow">THIS WEEK</p><h2>Activity trend</h2></div></div><div id="mainTrendChart" class="trend-chart large"></div></section>
           <section class="panel span-4"><div class="panel-head"><div><p class="eyebrow">CONVERSION</p><h2>Current ratios</h2></div></div><div id="conversionList" class="conversion-list"></div></section>
           <section class="panel span-12"><div class="panel-head"><div><p class="eyebrow">CONSISTENCY</p><h2>Agent trend table</h2></div></div><div class="table-wrap"><table><thead><tr><th>Agent</th><th>Scheduled days</th><th>Avg completion</th><th>Calls</th><th>Connect rate</th><th>Appointments</th><th>Direction</th></tr></thead><tbody id="trendTable"></tbody></table></div></section>
         </div>
@@ -220,6 +221,6 @@
     <span id="liveState" class="live-state app-live-state"><i></i> Connecting</span>
   </div>
 
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=2.6.1"></script>
 </body>
 </html>

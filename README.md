@@ -1,6 +1,46 @@
-# MNGR v2.3.0 — Weekly Health Manager
+# MNGR v2.6.1 — AGNT Navigation Match
 
 Standalone management intelligence for multiple AGNT teams and authorised solo agents.
+
+## v2.6.1 AGNT navigation match
+
+- Matches the confirmed AGNT stable build's 72px navigation height, 52px tab targets, 20px icons, label sizing and iPhone safe-area spacing.
+- Preserves MNGR's four navigation destinations and existing active colour.
+- Makes no changes to reporting logic, Firebase or AGNT.
+
+## v2.6.0 release coherence
+
+- Versioned CSS, JavaScript and Firebase configuration URLs prevent an old script from running inside a newer interface.
+- The service worker now checks the network without HTTP cache before falling back offline, and reloads once when the active controller changes.
+- Empty reporting data is distinguished from a source that is still syncing.
+- The manager greeting prefers the AGNT profile name before falling back to the manager account or email.
+- Trend bars share a common scale; conversion progress bars now represent the displayed percentage directly.
+- Chart stacks, lower navigation placement and scroll clearance are tightened for the installed iPhone PWA.
+
+No AGNT source files, Firebase rules, indexes, schema, or write paths are changed by this release.
+
+## v2.5.0 pace, ranking and containment
+
+- Calculates weekly health from elapsed scheduled workdays rather than calendar days.
+- Excludes an agent's live zero from weekly health when today is not one of their configured AGNT workdays.
+- Keeps a 100% agent On track when all elapsed scheduled days are complete, regardless of future workdays still ahead.
+- Orders homepage health, Team scorecards and the trend table from highest to lowest completion.
+- Reduces the bottom navigation by a further 20% and keeps it fixed to the bottom edge.
+- Converts the wide mobile trend table into contained performance rows without losing its supporting figures.
+- Caps trend bars within their chart area and keeps legends inside their panels.
+- Adds width and overflow containment to metrics, panels, appointments and team cards.
+- AGNT application files, Firebase rules and indexes remain unchanged.
+
+## v2.4.0 period and viewport correction
+
+- Consolidates the installed-iPhone bottom navigation into one 56px viewport-fixed bar.
+- Removes the legacy application padding that was adding space above the navigation.
+- Makes Today, This week and Last 4 weeks recalculate Home, Team, Appointments and Trends from the same selected period.
+- Makes homepage agent health, management priority, appointment preview, snapshot and activity chart period-aware.
+- Makes appointment totals and lists use dates from the selected reporting period.
+- Makes trend metrics, charts, conversions, agent rows and direction use the selected reporting period.
+- Separates manager-tool query errors from AGNT reporting health so an access-workflow issue is not presented as missing agent data.
+- AGNT application files, Firestore rules and indexes remain unchanged from v2.3.0.
 
 ## v2.3.0 weekly health and shell correction
 
