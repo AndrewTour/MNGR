@@ -1,6 +1,14 @@
-# MNGR v2.6.1 — AGNT Navigation Match
+# MNGR v2.7.0 — Last Week
 
 Standalone management intelligence for multiple AGNT teams and authorised solo agents.
+
+## v2.7.0 last-week reporting
+
+- Adds Last week to the shared period selector.
+- Uses the complete previous Monday-to-Sunday window.
+- Recalculates Home, Team, Appointments and Trends from that same historical period.
+- Preserves the AGNT-sized navigation and all v2.6 reporting fixes.
+- Makes no changes to Firebase or AGNT.
 
 ## v2.6.1 AGNT navigation match
 

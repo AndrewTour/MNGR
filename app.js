@@ -1,7 +1,7 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,updateProfile,signOut,setPersistence,browserLocalPersistence} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {initializeFirestore,getFirestore,persistentLocalCache,persistentMultipleTabManager,collection,collectionGroup,doc,getDoc,getDocs,query,where,orderBy,startAt,endAt,documentId,onSnapshot,setDoc,updateDoc,writeBatch,serverTimestamp,Timestamp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
-import {firebaseConfig} from './firebase-config.js?v=2.6.1';
+import {firebaseConfig} from './firebase-config.js?v=2.7.0';
 
 const firebaseApp=initializeApp(firebaseConfig);
 const auth=getAuth(firebaseApp);
@@ -26,7 +26,7 @@ function formatDate(key,{weekday=false}={}){if(!/^\d{4}-\d{2}-\d{2}$/.test(Strin
 function today(){return dateKey()}
 function initials(name=''){return String(name).trim().split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]?.toUpperCase()||'').join('')||'A'}
 function firstName(name=''){return String(name||'Agent').trim().split(/\s+/)[0]||'Agent'}
-function periodName(){return state.period==='today'?'Today':state.period==='week'?'This week':'Last 4 weeks'}
+function periodName(){return state.period==='today'?'Today':state.period==='week'?'This week':state.period==='last'?'Last week':'Last 4 weeks'}
 function greeting(){const hour=new Date().getHours();return hour<12?'Good morning':hour<18?'Good afternoon':'Good evening'}
 function formattedToday(){return new Intl.DateTimeFormat('en-AU',{weekday:'long',day:'numeric',month:'long'}).format(new Date())}
 function updatedMillis(value){if(typeof value?.toMillis==='function')return value.toMillis();if(number(value?.seconds))return number(value.seconds)*1000;return number(value)}
@@ -138,9 +138,10 @@ function bindMemberData(){
 function handleDataError(error,source='unknown'){console.error(error);sourceStatus(source,'error',error);if(isReportingSourceKey(source)&&String(error?.code||'').includes('permission-denied'))setNotice('One authorised reporting source is unavailable. Available figures remain live.');}
 
 function leaderboardFor(uid){return state.leaderboard.find(item=>item.uid===uid)||{uid,name:memberName(uid),targets:{calls:50,connects:25,data:10,knock:60},dailyHistory:{},weekHistory:{},appointments:{}}}
-function periodKeys(period=state.period){const now=new Date(),start=period==='today'?now:period==='week'?monday(now):addDays(now,-27),end=now;const keys=[];for(let d=new Date(start);d<=end;d=addDays(d,1))keys.push(dateKey(d));return keys}
-function periodLabel(period=state.period){return period==='today'?'today':period==='week'?'this week':'the last 4 weeks'}
-function periodEyebrow(period=state.period){return period==='today'?'TODAY':period==='week'?'THIS WEEK':'LAST 4 WEEKS'}
+function periodRange(period=state.period){const now=new Date();if(period==='today')return{start:now,end:now};if(period==='week')return{start:monday(now),end:now};if(period==='last'){const start=addDays(monday(now),-7);return{start,end:addDays(start,6)}}return{start:addDays(now,-27),end:now}}
+function periodKeys(period=state.period){const{start,end}=periodRange(period),keys=[];for(let d=new Date(start);d<=end;d=addDays(d,1))keys.push(dateKey(d));return keys}
+function periodLabel(period=state.period){return period==='today'?'today':period==='week'?'this week':period==='last'?'last week':'the last 4 weeks'}
+function periodEyebrow(period=state.period){return period==='today'?'TODAY':period==='week'?'THIS WEEK':period==='last'?'LAST WEEK':'LAST 4 WEEKS'}
 function entryWorkDays(entry={}){return Array.isArray(entry.workDays)?[...new Set(entry.workDays.map(Number).filter(day=>day>=0&&day<=6))]:[]}
 function entryScheduledOn(entry,key){const workDays=entryWorkDays(entry);if(key===today()&&typeof entry.activeToday==='boolean')return entry.activeToday;if(workDays.length)return workDays.includes(parseKey(key).getDay());return true}
 function historyRecords(entry,period=state.period){const keys=new Set(periodKeys(period)),records=[];Object.entries(entry.dailyHistory||{}).forEach(([key,value])=>{if(keys.has(key)&&entryScheduledOn(entry,key))records.push({date:key,...value})});if(keys.has(today())&&entry.date===today()&&entryScheduledOn(entry,today())&&!records.some(item=>item.date===today()))records.push({date:today(),calls:entry.calls,connects:entry.connects,data:entry.data,knockMinutes:entry.knockMinutes,score:entry.score,targets:entry.targets,appointments:entry.appointments,appointmentDetails:entry.appointmentDetails});return records.sort((a,b)=>a.date.localeCompare(b.date))}
@@ -176,8 +177,8 @@ function periodAttentionAppointments(){const keys=new Set(periodKeys());return a
 function metricCard(label,value,meta='',tone=''){return`<article class="metric-card ${tone}"><span>${esc(label)}</span><strong>${esc(value)}</strong><small>${esc(meta)}</small></article>`}
 function renderMetrics(){
   if(!reportingReady()){const waiting=metricCard('Waiting','—','current data');$('#metricGrid').innerHTML=waiting.repeat(4);return}
-  const data=teamAggregate();const connectRate=data.calls?Math.round(data.connects/data.calls*100):0,periodLabel=state.period==='today'?'today':state.period==='week'?'this week':'last 4 weeks';
-  $('#metricGrid').innerHTML=[metricCard('Completion',`${data.score}%`,periodLabel),metricCard('Calls',data.calls,periodLabel),metricCard('Connect rate',`${connectRate}%`,`${data.connects} connects`),metricCard('Appointments',data.appointments,'booked in period')].join('');
+  const data=teamAggregate();const connectRate=data.calls?Math.round(data.connects/data.calls*100):0,label=periodLabel();
+  $('#metricGrid').innerHTML=[metricCard('Completion',`${data.score}%`,label),metricCard('Calls',data.calls,label),metricCard('Connect rate',`${connectRate}%`,`${data.connects} connects`),metricCard('Appointments',data.appointments,'booked in period')].join('');
 }
 function renderBrief(){
   const setBrief=(value,label,title,copy)=>{$('#teamScore').textContent=value;$('#scoreLabel').textContent=label;$('#briefTitle').textContent=title;$('#briefCopy').textContent=copy};
@@ -306,4 +307,4 @@ $$('[data-appointment-mode]').forEach(button=>button.addEventListener('click',()
 $('#refreshData').addEventListener('click',()=>{const button=$('#refreshData');button.classList.add('loading');button.disabled=true;setTimeout(()=>window.location.reload(),180)});
 
 onAuthStateChanged(auth,user=>{if(user)startManager(user);else{stopSubscriptions();state.user=null;state.teamId='';state.team=null;boundSignature='';showOnly('authView')}});
-if('serviceWorker'in navigator)window.addEventListener('load',async()=>{const reloadOnce=()=>{const key='mngr:controller-reload:2.6.1';if(sessionStorage.getItem(key))return;sessionStorage.setItem(key,'1');location.reload()};navigator.serviceWorker.addEventListener('controllerchange',reloadOnce);try{const registration=await navigator.serviceWorker.register('./service-worker.js?v=2.6.1',{updateViaCache:'none'});await registration.update()}catch(error){console.error(error)}});
+if('serviceWorker'in navigator)window.addEventListener('load',async()=>{const reloadOnce=()=>{const key='mngr:controller-reload:2.7.0';if(sessionStorage.getItem(key))return;sessionStorage.setItem(key,'1');location.reload()};navigator.serviceWorker.addEventListener('controllerchange',reloadOnce);try{const registration=await navigator.serviceWorker.register('./service-worker.js?v=2.7.0',{updateViaCache:'none'});await registration.update()}catch(error){console.error(error)}});
